@@ -1,0 +1,66 @@
+name: Testing Core Components
+on:
+  pull_request:
+    paths:
+      - "itext2kg/**"
+      - "tests/**"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - "setup.cfg"
+  push:
+    branches:
+      - "main"
+    paths:
+      - "itext2kg/**"
+      - "tests/**"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - "setup.cfg"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"] # List of Python versions to test
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache uv folder
+        id: cache-uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-python-${{ matrix.python-version }}-uv-${{ hashFiles('requirements.txt') }}
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install dependencies
+        run: uv pip install --system -r requirements.txt
+
+      - name: Cache .pytest_cache folder
+        id: pytest_cache
+        uses: actions/cache@v4
+        with:
+          path: .pytest_cache
+          key: pytest_cache-${{ github.head_ref }}
+
+      - name: Run unit tests
+        run: python -m pytest tests/ -v --tb=short
+
+      - name: Test import of main components
+        run: |
+          python -c "from itext2kg import Atom, iText2KG, iText2KG_Star; print('✅ Main components import successful')"
+          python -c "from itext2kg.atom import GraphMatcher; print('✅ Atom GraphMatcher import successful')"
+          python -c "from itext2kg.atom.models import Entity, Relationship, KnowledgeGraph; print('✅ Atom Models import successful')"
+          python -c "from itext2kg.itext2kg_star.models import Entity, Relationship, KnowledgeGraph; print('✅ iText2KG Models import successful')"
