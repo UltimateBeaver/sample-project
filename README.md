@@ -32,7 +32,6 @@ NEO4J_PASSWORD=password
 ```
 3. Run/download all the required containers (Neo4j) through the following commands:
 ```bash
-cd docker
 # Start the containers (install image if it does not exists)
 docker compose up -d
 # Stop the containers
