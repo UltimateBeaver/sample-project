@@ -3,7 +3,7 @@ Sample repo for master's degree thesis
 
 # Requirements
 * Python (3.9 or greater) at https://www.python.org/downloads/
-* Docker
+* Docker at https://www.docker.com/
 * Ollama at https://ollama.com/download (used as a temporarily free model)
 
 # Installation
