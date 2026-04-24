@@ -73,7 +73,7 @@ model_ollama_gemma3 = ChatOllama(
     temperature=0,
 )
 model_ollama_llama3 = ChatOllama(
-    model="llama3.1:latest",
+    model="llama3.2:3b",
     base_url=ollama_base_url,
     temperature=0,
 )
