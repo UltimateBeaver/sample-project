@@ -1,0 +1,23 @@
+services:
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    environment:
+      # We map the keys from your .env to the names Neo4j expects
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      # Relative to the location of the docker-compose.yml
+      - ./docker/data:/data
+      - ./docker/logs:/logs
+      - ./docker/import:/var/lib/neo4j/import
+      - ./docker/plugins:/plugins
+    networks:
+      - project_net
+
+networks:
+  project_net:
+    driver: bridge

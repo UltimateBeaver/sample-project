@@ -209,3 +209,4 @@ __marimo__/
 
 # Additional gitignore settings
 /ignore
+/docker

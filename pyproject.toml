@@ -1,0 +1,16 @@
+[project]
+name = "sample-project"
+version = "0.1.0"
+dependencies = [
+    "pandas",
+    "langchain-openai",
+    "langchain-ollama",
+    "python-dotenv"
+]
+
+[tool.setuptools]
+packages = ["models"]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
