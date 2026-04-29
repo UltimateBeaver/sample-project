@@ -5,6 +5,7 @@ Sample repo for master's degree thesis
 * Python (3.9 or greater) at https://www.python.org/downloads/
 * Docker at https://www.docker.com/
 * Ollama at https://ollama.com/download (used as a temporarily free model)
+* At least 16 GB of GPU VRAM memory (to execute gemma4 model)
 
 # Installation
 1. Open up a terminal (Windows users must use Powershell), move to your desired directory and copy-paste the following commands:
@@ -44,9 +45,9 @@ docker compose down -v
 4. If you use Ollama, as default settings in models/models.py, download the required models:
 ```bash
 # Default llm model
-ollama pull gemma3:1b
+ollama pull gemma4:e4b
 # Default embedding model
-ollama pull nomic-embed-text
+ollama pull nomic-embed-text:latest
 ```
 Note: you can download other ollama models from here: https://ollama.com/search
 

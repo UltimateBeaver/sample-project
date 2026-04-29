@@ -3,10 +3,14 @@ import ast
 import asyncio
 import logging
 from models.models import *
+from sanity_checks.test_config import validate_config
 
 # Import LLM and Embeddings models using LangChain wrappers
-from itext2kg.atom import Atom
-from itext2kg import Neo4jStorage
+from itext2kg_atom.itext2kg.atom import Atom
+from itext2kg_atom.itext2kg import Neo4jStorage
+
+import langchain
+langchain.debug = True
 
 
 # Configure logging to see itext2kg intermediary steps
@@ -14,8 +18,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Get default llm model and embedding model
-openai_llm_model = get_default_model()
-openai_embeddings_model = get_default_embedding_model()
+base_llm_model = get_default_model()
+base_embeddings_model = get_default_embedding_model()
 
 # Define a helper function to convert the dataframe's atomic facts into a dictionary,
 # where keys are observation dates and values are the combined list of atomic facts for that date.
@@ -30,15 +34,20 @@ def to_dictionary(df:pd.DataFrame, max_elements: int | None = 20):
 
 
 async def main():
+    config_ok = await validate_config()
+    if not config_ok:
+        logger.error("Configuration validation failed. Exiting.")
+        return
     
-    # Load the 2020-COVID-NYT dataset pickle
-    news_covid = pd.read_pickle("./itext2kg-1.0.0/datasets/atom/nyt_news/2020_nyt_COVID_last_version_ready.pkl")
+    # Load the 2020-COVID-NYT dataset pickle (only 10 rows for testing)
+    #news_covid = pd.read_pickle("./itext2kg-1.0.0/datasets/atom/nyt_news/2020_nyt_COVID_last_version_ready.pkl")
+    news_covid = pd.read_pickle("./small_pickle.pkl")
 
     # Convert the dataframe into the required dictionary format
     news_covid_dict = to_dictionary(news_covid)
 
-    # Initialize the ATOM pipeline with the OpenAI models
-    atom = Atom(llm_model=openai_llm_model, embeddings_model=openai_embeddings_model)
+    # Initialize the ATOM pipeline with the LLM and embedding models
+    atom = Atom(llm_model=base_llm_model, embeddings_model=base_embeddings_model)
 
     # Build the knowledge graph across different observation timestamps
     kg = await atom.build_graph_from_different_obs_times(
@@ -47,12 +56,8 @@ async def main():
     )
 
     # Visualize the resulting knowledge graph using Neo4j
-    URI = neo4j_uri
-    USERNAME = neo4j_username
-    PASSWORD = neo4j_password
-
     logger.info("Connecting to Neo4j and visualizing graph...")
-    Neo4jStorage(uri=URI, username=USERNAME, password=PASSWORD).visualize_graph(knowledge_graph=kg)
+    Neo4jStorage(uri=neo4j_uri, username=neo4j_username, password=neo4j_password).visualize_graph(knowledge_graph=kg)
     logger.info("Graph visualization complete!")
 
 

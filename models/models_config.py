@@ -14,6 +14,14 @@ _CHAT_DEFAULTS = dict(
 )
 
 # ---------------------------------------------------------------------------
+# Ollama-specific defaults (fewer parameters to avoid warnings)
+# ---------------------------------------------------------------------------
+_OLLAMA_DEFAULTS = dict(
+    temperature=0,
+    keep_alive="5m",  # Keep model in memory for 5 min
+)
+
+# ---------------------------------------------------------------------------
 # LLM models
 # ---------------------------------------------------------------------------
 # OpenAI LLM
@@ -70,12 +78,13 @@ model_mistral_7b = ChatOpenAI(
 model_ollama_gemma3 = ChatOllama(
     model="gemma3:1b",
     base_url=ollama_base_url,
-    temperature=0,
+    **_OLLAMA_DEFAULTS,
 )
-model_ollama_llama3 = ChatOllama(
-    model="llama3.2:3b",
+model_ollama_gemma4 = ChatOllama(
+    model="gemma4:e4b",
+    format="json",
     base_url=ollama_base_url,
-    temperature=0,
+    **_OLLAMA_DEFAULTS,
 )
 
 # ---------------------------------------------------------------------------
@@ -106,6 +115,8 @@ embeddings_bge_base = OpenAIEmbeddings(
 
 # --- Local / Ollama embeddings (using native Ollama API) -----------
 embeddings_ollama_nomic = OllamaEmbeddings(
-    model="nomic-embed-text",           # run: ollama pull nomic-embed-text
+    model="nomic-embed-text:latest",           # run: ollama pull nomic-embed-text
     base_url=ollama_base_url,
+    #embed_batch_size=32,                # Batch embeddings for efficiency
+    #keep_alive="5m",                    # Keep model in memory
 )

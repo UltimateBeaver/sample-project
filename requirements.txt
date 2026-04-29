@@ -1,4 +1,4 @@
 # Install the local library
--e ./itext2kg-1.0.0
+-e ./itext2kg_atom
 # Install the current root directory (and all its dependencies)
 -e .
