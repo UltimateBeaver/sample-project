@@ -16,6 +16,7 @@ class ProviderType(Enum):
     OPENAI = "openai"
     MISTRAL = "mistral"
     CLAUDE = "claude"
+    OLLAMA = "ollama"
     UNKNOWN = "unknown"
 
 @dataclass
@@ -60,6 +61,14 @@ PROVIDER_CONFIGS = {
         max_pending_requests=1000,   # Conservative pending request limit
         sleep_between_batches=1.2,   # 1.2s delay = 50 RPM (respects rate limit)
     ),
+    ProviderType.OLLAMA: ProviderConfig(
+        name="Ollama",
+        max_elements_per_batch=50,   # Send 50 prompts to Ollama's queue at once
+        max_tokens_per_batch=8000,   # 8K input tokens per minute limit
+        max_context_window=128000,   # Ollama context window
+        max_pending_requests=None,   # Ollama doesn't have explicit pending request limits
+        sleep_between_batches=0.0,   # No delay (depends on local resources)
+    ),
     ProviderType.UNKNOWN: ProviderConfig(
         name="Unknown",
         max_elements_per_batch=5,    # Even more conservative (was 50)
@@ -67,7 +76,7 @@ PROVIDER_CONFIGS = {
         max_context_window=32000,
         max_pending_requests=10000,
         sleep_between_batches=10.0,  # Very long delays (was 2.0)
-    )
+    ),
 }
 
 class LangchainOutputParser(LLMOutputParserInterface):
@@ -138,6 +147,10 @@ class LangchainOutputParser(LLMOutputParserInterface):
             return ProviderType.CLAUDE
         if 'anthropic' in model_module or 'claude' in model_module:
             return ProviderType.CLAUDE
+        
+        # Check for Ollama indicators
+        if any(indicator in model_class_name for indicator in ['ollama', 'chatollama']):
+            return ProviderType.OLLAMA
             
         # Check model attributes for additional clues
         if hasattr(self.model, 'model_name'):
@@ -148,7 +161,7 @@ class LangchainOutputParser(LLMOutputParserInterface):
                 return ProviderType.MISTRAL
             if 'claude' in model_name or 'anthropic' in model_name:
                 return ProviderType.CLAUDE
-                
+
         logger.warning(f"⚠️  Could not auto-detect provider from model: {model_class_name}")
         logger.warning(f"   Module: {model_module}")
         logger.warning("   Using conservative defaults for unknown provider")
