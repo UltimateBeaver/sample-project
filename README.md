@@ -25,7 +25,7 @@ OPENAI_API_KEY=your-actual-key-here
 TOGETHER_API_BASE=https://api.together.xyz/v1
 TOGETHER_API_KEY=your-actual-key-here
 # Ollama
-OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_BASE_URL=http://localhost:11434
 # Neo4j
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USERNAME=neo4j
