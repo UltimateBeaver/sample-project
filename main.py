@@ -49,16 +49,36 @@ async def main():
     # Initialize the ATOM pipeline with the LLM and embedding models
     atom = Atom(llm_model=base_llm_model, embeddings_model=base_embeddings_model)
 
+    # Initialize the Neo4j storage with connection details from environment variables
+    neo4j = Neo4jStorage(
+        uri=neo4j_uri, 
+        username=neo4j_username, 
+        password=neo4j_password
+    )
+    # Read the existing graph from Neo4j
+    existing_kg = None
+    neo4j.delete_graph()
+    # commented for testing purposes to start with an empty graph each time
+    # existing_kg = neo4j.read_graph()
+    # if existing_kg.is_empty():
+    #     logger.info("No existing graph found in Neo4j. Starting with an empty graph.")
+    #     existing_kg = None
+
     # Build the knowledge graph across different observation timestamps
     kg = await atom.build_graph_from_different_obs_times(
         atomic_facts_with_obs_timestamps=news_covid_dict,
-        
+        existing_knowledge_graph=existing_kg
     )
 
-    # Visualize the resulting knowledge graph using Neo4j
-    logger.info("Connecting to Neo4j and visualizing graph...")
-    Neo4jStorage(uri=neo4j_uri, username=neo4j_username, password=neo4j_password).visualize_graph(knowledge_graph=kg)
-    logger.info("Graph visualization complete!")
+    # Update the resulting knowledge graph in Neo4j
+    logger.info("Connecting to Neo4j and updating graph...")
+    neo4j.store_graph(knowledge_graph=kg)
+    # Neo4jStorage(
+    #     uri=neo4j_uri, 
+    #     username=neo4j_username, 
+    #     password=neo4j_password
+    # ).update_graph(knowledge_graph=kg, merge_function=atom.parallel_atomic_merge, delete_existing_graph=True)
+    logger.info("Graph storing complete! Check out " + neo4j_uri + " to visualize the graph.")
 
 
 if __name__ == "__main__":

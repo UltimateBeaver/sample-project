@@ -246,9 +246,9 @@ class Neo4jStorage(GraphStorageInterface):
         return rels
 
 
-    def visualize_graph(self, knowledge_graph: KnowledgeGraph, parent_node_type: str = "Hadith") -> None:
+    def store_graph(self, knowledge_graph: KnowledgeGraph, parent_node_type: str = "Hadith") -> None:
         """
-        Runs the necessary queries to visualize a graph structure from a KnowledgeGraph input.
+        Runs the necessary queries to store a graph structure in Neo4j from a KnowledgeGraph input.
         Also creates HAS_ENTITY relationships between existing nodes and knowledge graph entities.
         
         Args:
@@ -352,3 +352,209 @@ class Neo4jStorage(GraphStorageInterface):
             'labels': label_mapping,
             'relationships': relationship_mapping
         }
+
+    def delete_graph(self) -> None:
+        """
+        Deletes all nodes and relationships from the Neo4j database.
+        
+        WARNING: This is destructive and cannot be undone. All data in the database will be removed.
+        
+        Returns:
+            None
+        """
+        delete_query = "MATCH (n) DETACH DELETE n"
+        try:
+            self.run_query(delete_query)
+            logger.info("Successfully deleted all nodes and relationships from Neo4j database")
+        except Exception as e:
+            logger.error(f"Error deleting graph from Neo4j: {e}")
+            raise
+
+    def read_graph(self) -> KnowledgeGraph:
+        """
+        Reads all nodes and relationships from Neo4j database and converts them into a KnowledgeGraph object.
+        
+        This method queries all existing nodes and relationships from the database and reconstructs
+        the KnowledgeGraph structure, preserving all properties including embeddings and temporal information.
+        
+        Returns:
+            KnowledgeGraph: A KnowledgeGraph object populated with all entities and relationships from Neo4j
+            
+        Raises:
+            Exception: If there's an error querying the Neo4j database
+        """
+        from itext2kg.atom.models.entity import Entity, EntityProperties
+        from itext2kg.atom.models.relationship import Relationship, RelationshipProperties
+        
+        entities = []
+        relationships = []
+        
+        try:
+            # Query to get all nodes with their properties
+            nodes_query = "MATCH (n) RETURN n"
+            node_records = self.run_query_with_result(nodes_query)
+            
+            # Build entities from nodes
+            entity_dict = {}  # Map node element_id to Entity objects for relationship building
+            for record in node_records:
+                node = record["n"]
+                
+                # Extract node properties
+                properties = dict(node.items())
+                
+                # Handle embeddings if present
+                embeddings = None
+                if "embeddings" in properties:
+                    embeddings_str = properties.pop("embeddings")
+                    if embeddings_str:
+                        try:
+                            embeddings = self.transform_str_list_to_embeddings(embeddings_str)
+                        except Exception as e:
+                            logger.warning(f"Could not parse embeddings: {e}")
+                            embeddings = None
+                
+                # Create Entity with label from first node label
+                entity = Entity(
+                    name=properties.get("name", ""),
+                    label=list(node.labels)[0] if node.labels else "Entity",
+                    properties=EntityProperties(embeddings=embeddings)
+                )
+                
+                entities.append(entity)
+                entity_dict[node.element_id] = entity
+            
+            logger.info(f"Read {len(entities)} entities from Neo4j")
+            
+            # Query to get all relationships with their properties
+            rels_query = "MATCH (n)-[r]->(m) RETURN n, r, m"
+            rel_records = self.run_query_with_result(rels_query)
+            
+            # Build relationships
+            for record in rel_records:
+                start_node = record["n"]
+                rel = record["r"]
+                end_node = record["m"]
+                
+                # Get corresponding entities
+                start_entity = entity_dict.get(start_node.element_id)
+                end_entity = entity_dict.get(end_node.element_id)
+                
+                if start_entity and end_entity:
+                    # Extract relationship properties
+                    rel_properties = dict(rel.items())
+                    
+                    # Handle embeddings if present
+                    embeddings = None
+                    if "embeddings" in rel_properties:
+                        embeddings_str = rel_properties.pop("embeddings")
+                        if embeddings_str:
+                            try:
+                                embeddings = self.transform_str_list_to_embeddings(embeddings_str)
+                            except Exception as e:
+                                logger.warning(f"Could not parse relationship embeddings: {e}")
+                                embeddings = None
+                    
+                    # Handle list properties (atomic_facts, t_obs, t_start, t_end)
+                    atomic_facts = rel_properties.pop("atomic_facts", [])
+                    t_obs = rel_properties.pop("t_obs", [])
+                    t_start = rel_properties.pop("t_start", [])
+                    t_end = rel_properties.pop("t_end", [])
+                    
+                    # Create RelationshipProperties
+                    rel_props = RelationshipProperties(
+                        embeddings=embeddings,
+                        atomic_facts=atomic_facts if isinstance(atomic_facts, list) else [],
+                        t_obs=t_obs if isinstance(t_obs, list) else [],
+                        t_start=t_start if isinstance(t_start, list) else [],
+                        t_end=t_end if isinstance(t_end, list) else []
+                    )
+                    
+                    # Create Relationship
+                    relationship = Relationship(
+                        name=rel.type,
+                        startEntity=start_entity,
+                        endEntity=end_entity,
+                        properties=rel_props
+                    )
+                    
+                    relationships.append(relationship)
+            
+            logger.info(f"Read {len(relationships)} relationships from Neo4j")
+            
+            return KnowledgeGraph(entities=entities, relationships=relationships)
+            
+        except Exception as e:
+            logger.error(f"Error reading graph from Neo4j: {e}")
+            raise
+
+    # def update_graph(self, 
+    #                 knowledge_graph: KnowledgeGraph,
+    #                 merge_function,
+    #                 delete_existing_graph: bool = False,
+    #                 ent_threshold: float = 0.8,
+    #                 rel_threshold: float = 0.8,
+    #                 max_workers: int = 8) -> KnowledgeGraph:
+    #     """
+    #     Updates the Neo4j database by merging existing graph with a new KnowledgeGraph.
+        
+    #     This method:
+    #     1. Reads the existing KnowledgeGraph from Neo4j
+    #     2. Merges it with the new KnowledgeGraph using the provided merge function
+    #     3. Stores the merged result back to Neo4j
+        
+    #     Args:
+    #         new_knowledge_graph (KnowledgeGraph): The new KnowledgeGraph to merge with existing data
+    #         merge_function: The merge function to use (typically Atom.parallel_atomic_merge)
+    #         ent_threshold (float): Entity matching threshold for merge (default: 0.8)
+    #         rel_threshold (float): Relationship matching threshold for merge (default: 0.8)
+    #         max_workers (int): Number of workers for parallel merge (default: 8)
+            
+    #     Returns:
+    #         KnowledgeGraph: The merged KnowledgeGraph that was stored in Neo4j
+            
+    #     Raises:
+    #         Exception: If there's an error reading, merging, or writing to Neo4j
+    #     """
+    #     try:
+    #         existing_kg = None
+            
+    #         if delete_existing_graph:
+    #             # Clear existing database and store merged graph
+    #             logger.info("Deleting existing graph from Neo4j before storing merged graph...")
+    #             self.delete_graph()
+    #         else:
+    #             # Read existing graph from Neo4j
+    #             logger.info("Reading existing graph from Neo4j...")
+    #             existing_kg = self.read_graph()
+            
+    #         if existing_kg is None or existing_kg.is_empty():
+    #             logger.info("No existing graph in Neo4j. Storing new graph directly...")
+    #             merged_kg = knowledge_graph
+    #         else:
+    #             # Merge existing and new graphs
+    #             logger.info(f"Merging graphs: {len(existing_kg.entities)} existing entities + "
+    #                       f"{len(knowledge_graph.entities)} new entities")
+                
+    #             # Create list of KGs to merge
+    #             kgs_to_merge = [existing_kg, knowledge_graph]
+                
+    #             # Call the merge function (typically Atom.parallel_atomic_merge)
+    #             merged_kg = merge_function(
+    #                 kgs=kgs_to_merge,
+    #                 ent_threshold=ent_threshold,
+    #                 rel_threshold=rel_threshold,
+    #                 max_workers=max_workers
+    #             )
+                
+    #             logger.info(f"Merge complete: {len(merged_kg.entities)} merged entities, "
+    #                       f"{len(merged_kg.relationships)} merged relationships")
+            
+    #         logger.info("Storing merged graph to Neo4j...")
+    #         self.store_graph(merged_kg)
+            
+    #         logger.info("Graph update complete!")
+    #         return merged_kg
+            
+    #     except Exception as e:
+    #         logger.error(f"Error updating graph: {e}")
+    #         raise

@@ -7,7 +7,7 @@ class GraphStorageInterface(Protocol):
     This interface ensures consistent behavior across different storage implementations.
     """
     
-    def visualize_graph(self, knowledge_graph: KnowledgeGraph) -> None:
+    def store_graph(self, knowledge_graph: KnowledgeGraph) -> None:
         """
         Visualizes the knowledge graph.
         
