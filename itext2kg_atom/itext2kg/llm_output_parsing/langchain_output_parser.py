@@ -63,11 +63,11 @@ PROVIDER_CONFIGS = {
     ),
     ProviderType.OLLAMA: ProviderConfig(
         name="Ollama",
-        max_elements_per_batch=50,   # Send 50 prompts to Ollama's queue at once
-        max_tokens_per_batch=8000,   # 8K input tokens per minute limit
-        max_context_window=128000,   # Ollama context window
+        max_elements_per_batch=32,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
+        max_tokens_per_batch=12000,   # Increased to 12K per request (local inference, not API limits)
+        max_context_window=32768,   # Ollama context window
         max_pending_requests=None,   # Ollama doesn't have explicit pending request limits
-        sleep_between_batches=0.0,   # No delay (depends on local resources)
+        sleep_between_batches=0.1,   # 100ms between batches to prevent GPU thrashing
     ),
     ProviderType.UNKNOWN: ProviderConfig(
         name="Unknown",
@@ -169,14 +169,18 @@ class LangchainOutputParser(LLMOutputParserInterface):
 
     def count_tokens(self, text: str, encoding_name: str = "cl100k_base") -> int:
         """
-        Count the number of tokens in a given text using tiktoken.
+        Count the number of tokens in a given text using provider-specific encoding.
         
-        Note: Using cl100k_base encoding as approximation for most models.
-        For more accuracy, consider using provider-specific tokenizers when available.
+        - OpenAI/Mistral/Claude: cl100k_base (GPT models)
+        - Gemma/Ollama: o200k_base (higher accuracy for open models)
         """
-        encoding = tiktoken.get_encoding(encoding_name)
-        tokens = encoding.encode(text)
-        return len(tokens)
+        # Use appropriate encoding based on provider
+        if self.provider_type == ProviderType.OLLAMA:
+            encoding_name = "o200k_base"  # Better for Gemma and other open models
+        elif encoding_name == "cl100k_base" and self.provider_type == ProviderType.UNKNOWN:
+            # For unknown providers, use o200k_base as safer default
+            encoding_name = "o200k_base"
+        
 
     def split_prompts_into_batches(self, prompts: List[str], max_elements: Optional[int] = None, max_tokens: Optional[int] = None, encoding_name: str = "cl100k_base") -> List[List[str]]:
         """
@@ -261,6 +265,7 @@ class LangchainOutputParser(LLMOutputParserInterface):
         - OpenAI: Larger batches (500 req, 80K tokens), minimal delays
         - Mistral: Sequential processing (50 req/batch, 200ms delays) respects 6 RPS limit
         - Claude: Sequential processing (50 req/batch, 1.2s delays) respects 50 RPM limit
+        - Ollama: Conservative batching (8 req/batch) for local GPU with 100ms delays
         - Unknown: Ultra conservative batches (5 req, 4K tokens), 10s delays
         
         Args:
@@ -268,6 +273,8 @@ class LangchainOutputParser(LLMOutputParserInterface):
             contexts: List of context strings to process
             system_query: The system query/instruction
         """
+        start_total = time.time()
+        
         # Validate against provider limits
         if self.config.max_pending_requests and len(contexts) > self.config.max_pending_requests:
             raise ValueError(
@@ -278,24 +285,35 @@ class LangchainOutputParser(LLMOutputParserInterface):
         structured_llm = self.model.with_structured_output(output_data_structure)
         
         # Create prompts for each context
+        start_prompt = time.time()
         all_prompts = [
             f"# Context: {context}\n\n# Question: {system_query}\n\nAnswer: "
             for context in contexts
         ]
+        prompt_time = time.time() - start_prompt
+        logger.debug(f"Prompt creation: {prompt_time:.2f}s for {len(contexts)} contexts")
         
         # Split the prompts into batches according to provider-specific limits
+        start_batch = time.time()
         batches = self.split_prompts_into_batches(all_prompts)
         logger.info(f"🚀 Processing {len(contexts):,} contexts in {len(batches)} batches for {self.config.name} API")
+        batch_time = time.time() - start_batch
+        logger.debug(f"Batch splitting: {batch_time:.2f}s ({len(batches)} batches)")
         
-        # Add time estimation for Mistral
+        
+        # Add time estimation for different providers
         if self.provider_type == ProviderType.MISTRAL and len(batches) > 1:
             estimated_time = len(batches) * self.config.sleep_between_batches
             if estimated_time > 60:
                 logger.info(f"⏰ Estimated processing time: {estimated_time/60:.1f} minutes (sequential processing)")
             else:
                 logger.info(f"⏰ Estimated processing time: {estimated_time:.1f} seconds")
+        elif self.provider_type == ProviderType.OLLAMA and len(batches) > 1:
+            estimated_time = len(batches) * self.config.sleep_between_batches
+            logger.info(f"⏰ Estimated processing time: {estimated_time:.1f}s ({len(batches)} batches × {self.config.sleep_between_batches*1000:.0f}ms)")
 
         outputs = []
+        batch_times = []
         # Process each batch sequentially to respect rate limits
         for i, batch in enumerate(batches):
             logger.info(f"📋 Processing batch {i+1}/{len(batches)} with {len(batch)} requests ({self.config.name})")
@@ -303,6 +321,8 @@ class LangchainOutputParser(LLMOutputParserInterface):
             # For Mistral and Claude, use exponential backoff and extra careful processing
             max_retries = 3 if self.provider_type in [ProviderType.MISTRAL, ProviderType.CLAUDE] else 2
             base_sleep = self.sleep_time
+            
+            start_batch_proc = time.time()
             
             for attempt in range(max_retries + 1):
                 try:
@@ -392,6 +412,12 @@ class LangchainOutputParser(LLMOutputParserInterface):
                     logger.warning(f"⚠️  Unexpected error in batch {i+1}, attempt {attempt+1}/{max_retries+1}: {e}")
                     logger.warning(f"   Sleeping for {sleep_time} seconds before retry")
                     time.sleep(sleep_time)
+            
+            # Log batch timing
+            batch_proc_time = time.time() - start_batch_proc
+            batch_times.append(batch_proc_time)
+            avg_per_req = batch_proc_time / len(batch)
+            logger.debug(f"   ✓ Batch {i+1} completed in {batch_proc_time:.2f}s ({avg_per_req*1000:.0f}ms per request)")
                     
             # Add provider-specific delay between batches
             if i < len(batches) - 1 and self.config.sleep_between_batches > 0:
@@ -399,4 +425,11 @@ class LangchainOutputParser(LLMOutputParserInterface):
                 time.sleep(self.config.sleep_between_batches)
                 
         logger.info(f"✅ Successfully processed all {len(outputs):,} requests for {self.config.name}")
+        
+        # Final summary with timing
+        total_time = time.time() - start_total
+        if batch_times:
+            avg_batch_time = sum(batch_times) / len(batch_times)
+            logger.info(f"Total time: {total_time:.2f}s (avg batch: {avg_batch_time:.2f}s)")
+            logger.debug(f"Prompt prep: {prompt_time:.2f}s | Batching: {batch_time:.2f}s | Processing: {sum(batch_times):.2f}s")
         return outputs

@@ -5,7 +5,7 @@ from .models_config import *
 # Default getters  (used by main.py)
 # ---------------------------------------------------------------------------
 # Change these two lines to switch the active configuration globally.
-_DEFAULT_LLM        = model_ollama_gemma4        # local Ollama
+_DEFAULT_LLM        = model_ollama_qwen2_5        # local Ollama
 _DEFAULT_EMBEDDINGS = embeddings_ollama_nomic    # local Ollama
 
 

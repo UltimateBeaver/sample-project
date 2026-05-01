@@ -55,7 +55,25 @@ class Atom:
     def parallel_atomic_merge(self, kgs: List[KnowledgeGraph], existing_kg: Optional[KnowledgeGraph] = None, rel_threshold: float = 0.8, ent_threshold: float = 0.8, max_workers: int = 4) -> KnowledgeGraph:
         """
         Merges a list of KnowledgeGraphs in parallel, reducing them pairwise.
+        
+        Handles edge cases:
+        - Empty input list: returns empty KnowledgeGraph
+        - Single KG: returns that KG (optionally merged with existing_kg)
         """
+        # Handle edge case: empty input list
+        if not kgs:
+            logger.warning("⚠️  No KGs to merge (empty list). Returning empty KnowledgeGraph.")
+            if existing_kg and not existing_kg.is_empty():
+                return existing_kg
+            return KnowledgeGraph()
+        
+        # Handle edge case: single KG in list
+        if len(kgs) == 1:
+            logger.debug(f"📊 Only one KG to process. Skipping merge loop.")
+            if existing_kg and not existing_kg.is_empty():
+                return self.merge_two_kgs(kgs[0], existing_kg, rel_threshold, ent_threshold)
+            return kgs[0]
+        
         # Keep merging until we have just one KG
         current = kgs
         while len(current) > 1:
@@ -79,6 +97,8 @@ class Atom:
                 merged_results.append(leftover)
             
             current = merged_results
+        
+        # Merge with existing graph if provided
         if existing_kg and not existing_kg.is_empty():
             return self.merge_two_kgs(current[0], existing_kg, rel_threshold, ent_threshold)
         return current[0]
@@ -91,6 +111,11 @@ class Atom:
         ent_threshold:float=0.8,
         max_workers:int=8,
         ):
+        # Handle case where LLM extracts no relationships (empty list or None)
+        if not relationships:
+            logger.debug("⚠️  No relationships extracted for this context. Returning empty KnowledgeGraph.")
+            return KnowledgeGraph()
+        
         embedded_relationships = []
         temp_kg = KnowledgeGraph(entities=[Entity(**rel.startNode.model_dump()) for rel in relationships] + [Entity(**rel.endNode.model_dump()) for rel in relationships])
         await temp_kg.embed_entities(embeddings_function=self.llm_output_parser.calculate_embeddings, entity_name_weight=entity_name_weight, entity_label_weight=entity_label_weight)
@@ -184,6 +209,18 @@ class Atom:
 
         logger.info("------- Merging Atomic KGs---------")
         cleaned_atomic_kgs = [kg for kg in atomic_kgs if kg.relationships != []]
+        
+        # Log statistics about extracted relationships
+        total_kgs = len(atomic_kgs)
+        empty_kgs = len(atomic_kgs) - len(cleaned_atomic_kgs)
+        total_relationships = sum(len(kg.relationships) for kg in atomic_kgs)
+        logger.info(f"📊 Relationship Extraction Summary:")
+        logger.info(f"   Total contexts: {len(atomic_facts)}")
+        logger.info(f"   Non-empty KGs: {len(cleaned_atomic_kgs)}/{total_kgs}")
+        if empty_kgs > 0:
+            logger.warning(f"   Empty KGs (no relationships): {empty_kgs}")
+        logger.info(f"   Total relationships extracted: {total_relationships}")
+        
         merged_kg = self.parallel_atomic_merge(kgs=cleaned_atomic_kgs, 
         rel_threshold=rel_threshold, 
         ent_threshold=ent_threshold, 

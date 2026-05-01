@@ -86,6 +86,12 @@ model_ollama_gemma4 = ChatOllama(
     base_url=ollama_base_url,
     **_OLLAMA_DEFAULTS,
 )
+model_ollama_qwen2_5 = ChatOllama(
+    model="qwen2.5:14b",
+    format="json",
+    base_url=ollama_base_url,
+    **_OLLAMA_DEFAULTS,
+)
 
 # ---------------------------------------------------------------------------
 # Embedding models

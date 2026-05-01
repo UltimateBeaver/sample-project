@@ -3,6 +3,8 @@ import logging.config
 import sys
 from typing import Optional
 
+import langchain
+
 
 def setup_logging(
     level: str = "INFO",
@@ -19,6 +21,7 @@ def setup_logging(
         log_file: Optional file path to write logs to
         console_output: Whether to output logs to console
     """
+
     if format_string is None:
         format_string = "[%(asctime)s] [%(levelname)8s] [%(name)s] %(message)s"
     
@@ -46,10 +49,18 @@ def setup_logging(
     
     # File handler
     if log_file:
-        file_handler = logging.FileHandler(log_file)
+        file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
         file_handler.setLevel(numeric_level)
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
+    
+    # Configure langchain logging
+    logging.getLogger("langchain").setLevel(logging.DEBUG)
+    logging.getLogger("langchain_core").setLevel(logging.DEBUG)
+    logging.getLogger("langchain_community").setLevel(logging.DEBUG)
+    
+    # Enable langchain debug mode (logs through logging system)
+    langchain.debug = True
     
     # Prevent propagation to avoid duplicate logs
     root_logger.propagate = False
@@ -67,6 +78,3 @@ def get_logger(name: str) -> logging.Logger:
     """
     return logging.getLogger(f"itext2kg.{name}")
 
-
-# Initialize default logging configuration
-setup_logging() 

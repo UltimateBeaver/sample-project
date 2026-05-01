@@ -8,14 +8,15 @@ from sanity_checks.test_config import validate_config
 # Import LLM and Embeddings models using LangChain wrappers
 from itext2kg_atom.itext2kg.atom import Atom
 from itext2kg_atom.itext2kg import Neo4jStorage
-
-import langchain
-langchain.debug = True
+from itext2kg_atom.itext2kg.logging_config import setup_logging
 
 
 # Configure logging to see itext2kg intermediary steps
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# logging.basicConfig(
+#     filename="logs/app.log",
+#     level=logging.INFO
+# )
+# logger = logging.getLogger(__name__)
 
 # Get default llm model and embedding model
 base_llm_model = get_default_model()
@@ -34,6 +35,15 @@ def to_dictionary(df:pd.DataFrame, max_elements: int | None = 20):
 
 
 async def main():
+    
+    # Initialize default logging configuration
+    setup_logging(
+        log_file="app.log", 
+        level="DEBUG",
+        console_output=True
+    )
+    logger = logging.getLogger("itext2kg")
+
     config_ok = await validate_config()
     if not config_ok:
         logger.error("Configuration validation failed. Exiting.")
