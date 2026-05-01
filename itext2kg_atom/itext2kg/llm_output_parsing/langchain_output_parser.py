@@ -181,6 +181,14 @@ class LangchainOutputParser(LLMOutputParserInterface):
             # For unknown providers, use o200k_base as safer default
             encoding_name = "o200k_base"
         
+        try:
+            encoding = self._get_encoding(encoding_name)
+            tokens = encoding.encode(text)
+            return len(tokens)
+        except Exception as e:
+            # Fallback: rough estimate (approximately 4 chars per token)
+            logger.warning(f"Token counting failed with {encoding_name}, using rough estimate: {e}")
+            return len(text) // 4
 
     def split_prompts_into_batches(self, prompts: List[str], max_elements: Optional[int] = None, max_tokens: Optional[int] = None, encoding_name: str = "cl100k_base") -> List[List[str]]:
         """
