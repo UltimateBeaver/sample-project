@@ -210,3 +210,21 @@ __marimo__/
 # Additional gitignore settings
 /ignore
 /docker
+
+# Microsoft Word
+*.docx.tmp
+*.doc.tmp
+~$*.docx
+~$*.doc
+
+# Microsoft Excel
+*.xlsx.tmp
+*.xls.tmp
+~$*.xlsx
+~$*.xls
+
+# Microsoft PowerPoint
+*.pptx.tmp
+*.ppt.tmp
+~$*.pptx
+~$*.ppt
