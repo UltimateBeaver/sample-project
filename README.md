@@ -60,5 +60,11 @@ venv/Scripts/activate
 python main.py
 ```
 
+---
 # Developer tips
 - When adding a new package, add the definition also in pyproject.toml
+
+# Bugfix Checklist
+[] Self loop relationships without any sense
+[] Entities with empty names
+[] Redundant relationships
