@@ -501,9 +501,13 @@ Final KnowledgeGraph
 
 **Model Initialization** [models/models.py]:
 ```python
-def get_default_model() -> ChatOpenAI
-def get_default_embedding_model() -> OpenAIEmbeddings
+def get_default_model() -> ChatOllama
+def get_default_embedding_model() -> OllamaEmbeddings
 ```
+
+**Current Configuration:**
+- `_DEFAULT_LLM = model_ollama_gemma4`
+- `_DEFAULT_EMBEDDINGS = embeddings_ollama_nomic`
 
 **LangChain Provider Configs** [llm_output_parsing/langchain_output_parser.py]:
 ```python

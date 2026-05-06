@@ -2,7 +2,7 @@
 
 ## 📚 Documentation Files Generated
 
-This documentation package contains 5 comprehensive guides covering your iText2KG & ATOM pipelines.
+This documentation package contains 8 comprehensive guides covering your iText2KG & ATOM pipelines.
 
 ### Generated Documents
 
@@ -27,11 +27,39 @@ This documentation package contains 5 comprehensive guides covering your iText2K
    - Neo4j output schema
    - **Best for:** Debugging and tracing execution
 
-4. **[PIPELINE_AND_CONFIGURATION_GUIDE.md](PIPELINE_AND_CONFIGURATION_GUIDE.md)** (From Subagent)
-   - Codebase overview
-   - Class hierarchy
-   - Integration guide
-   - **Best for:** High-level understanding
+4. **[CODEBASE_OVERVIEW.md](CODEBASE_OVERVIEW.md)** 🏗️ **ARCHITECTURE**
+   - Complete module structure and organization
+   - Class definitions and relationships
+   - Core data models
+   - Key methods by class
+   - **Best for:** Understanding overall architecture
+
+5. **[DETAILED_METHOD_REFERENCE.md](DETAILED_METHOD_REFERENCE.md)** 📋 **DETAILED METHODS**
+   - In-depth method documentation
+   - ATOM and iText2KG module reference
+   - GraphMatcher and Matcher algorithms
+   - **Best for:** Deep-diving into specific methods
+
+6. **[VISUAL_ARCHITECTURE_AND_REFERENCE.md](VISUAL_ARCHITECTURE_AND_REFERENCE.md)** 🎨 **VISUAL GUIDE**
+   - Architecture diagrams
+   - Data flow visualizations
+   - Class hierarchy and dependencies
+   - **Best for:** Visual learners
+
+7. **[COMPLETE_INDEX_AND_REFERENCE.md](COMPLETE_INDEX_AND_REFERENCE.md)** 📑 **COMPLETE INDEX**
+   - File structure index
+   - Class location index by file and line
+   - Method location index
+   - Schema classes reference
+   - Configuration index
+   - **Best for:** Quick reference and lookup
+
+8. **[DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)** (This File)
+   - Quick start guide by use case
+   - Configuration status summary
+   - Pipeline architecture overview
+   - Key classes reference
+   - **Best for:** Getting oriented
 
 ---
 
@@ -48,29 +76,25 @@ This documentation package contains 5 comprehensive guides covering your iText2K
 
 ---
 
-## 🔴 CRITICAL FINDINGS
+## ✅ Configuration Status
 
-### Configuration Mismatch: Type Annotation
-
+### Type Annotation - CORRECT
 **Location:** `models/models.py` lines 16-19
 
-**Problem:**
+The type annotations are **correct and match the runtime behavior**:
 ```python
-def get_default_embedding_model() -> OpenAIEmbeddings:  # ❌ WRONG TYPE
-    return _DEFAULT_EMBEDDINGS  # Actually returns OllamaEmbeddings
-```
+def get_default_model() -> ChatOllama:
+    """Return the default LLM model instance."""
+    return _DEFAULT_LLM
 
-**Impact:** Type checkers fail; IDE autocomplete incorrect
-
-**Fix:**
-```python
-from typing import Union
-from langchain_openai import OpenAIEmbeddings
-from langchain_ollama import OllamaEmbeddings
-
-def get_default_embedding_model() -> Union[OpenAIEmbeddings, OllamaEmbeddings]:
+def get_default_embedding_model() -> OllamaEmbeddings:
+    """Return the default embeddings model instance."""
     return _DEFAULT_EMBEDDINGS
 ```
+
+**Current Configuration:**
+- `_DEFAULT_LLM = model_ollama_gemma4` (Local Ollama - Gemma 4 model)
+- `_DEFAULT_EMBEDDINGS = embeddings_ollama_nomic` (Local Ollama - Nomic Embed text, 1024-dim)
 
 
 ---
@@ -154,28 +178,24 @@ neo4j_uri = "bolt://localhost:7687"  # Neo4j database
 Defines available model instances:
 ```python
 # Ollama (Local)
-model_ollama_llama3 = ChatOllama(model="qwen3.6:27b-q4_K_M", ...)
+model_ollama_gemma4 = ChatOllama(model="gemma4", ...)
 embeddings_ollama_nomic = OllamaEmbeddings(model="nomic-embed-text", ...)
 
-# OpenAI
+# OpenAI (Optional)
 model_gpt4o_mini = ChatOpenAI(model="gpt-4o-mini", ...)
 embeddings_text_embedding_3_small = OpenAIEmbeddings(model="text-embedding-3-small", ...)
-
-# Together AI
-model_llama3_3_70b = ChatOpenAI(model="meta-llama/Llama-3.3-70B-Instruct-Turbo-Free", ...)
-embeddings_bge_large = OpenAIEmbeddings(model="BAAI/bge-large-en-v1.5", ...)
 ```
 
 ### models.py
 Selects active models:
 ```python
-_DEFAULT_LLM = model_ollama_llama3
-_DEFAULT_EMBEDDINGS = embeddings_ollama_nomic  # ⚠️ Type mismatch!
+_DEFAULT_LLM = model_ollama_gemma4
+_DEFAULT_EMBEDDINGS = embeddings_ollama_nomic
 
 def get_default_model() -> ChatOllama:
     return _DEFAULT_LLM
 
-def get_default_embedding_model() -> OpenAIEmbeddings:  # ❌ WRONG!
+def get_default_embedding_model() -> OllamaEmbeddings:
     return _DEFAULT_EMBEDDINGS
 ```
 
@@ -325,7 +345,7 @@ storage.run_query("MATCH (n) RETURN count(n) as count")
 - [ ] Dependencies installed: `pip install -r itext2kg-1.0.0/requirements.txt`
 - [ ] `.env` file created with required keys
 - [ ] For Ollama: Service running (`ollama serve`)
-- [ ] For Ollama: Models pulled (`ollama pull qwen3.6:27b-q4_K_M`, `ollama pull nomic-embed-text`)
+- [ ] For Ollama: Models pulled (`ollama pull gemma4:e4b`, `ollama pull nomic-embed-text`)
 - [ ] For Neo4j: Database running (Docker or local)
 - [ ] Type annotation mismatch fixed in `models/models.py`
 - [ ] Configuration test passes (`python test_config.py`)
@@ -361,12 +381,12 @@ storage.run_query("MATCH (n) RETURN count(n) as count")
 
 ---
 
-## 📞 Support
+## 📞 Support & Troubleshooting
 
 For issues, check:
 1. Is Ollama running? `curl http://localhost:11434/v1/models`
 2. Are models available? `ollama list`
 3. Is Neo4j running? `bolt://localhost:7687`
-4. Check type annotations in `models/models.py`
-5. Review [CONFIGURATION_MISMATCH_ANALYSIS.md](CONFIGURATION_MISMATCH_ANALYSIS.md)
+4. Check type annotations in `models/models.py` (should match actual return types)
+5. Verify default models in `models/models.py` match your setup
 

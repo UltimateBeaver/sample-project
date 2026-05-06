@@ -280,19 +280,22 @@ itext2kg-1.0.0/
 
 | Variable | Purpose |
 |----------|---------|
-| `model_ollama_llama3` | Local Ollama LLM (Llama 3) |
-| `model_openai` | OpenAI GPT model |
-| `embeddings_ollama_nomic` | Local Ollama embeddings (Nomic) |
-| `embeddings_openai` | OpenAI embeddings |
+| `model_ollama_gemma4` | Local Ollama LLM (Gemma 4) - DEFAULT |
+| `model_gpt4o_mini` | OpenAI GPT-4o Mini |
+| `embeddings_ollama_nomic` | Local Ollama embeddings (Nomic - 1024-dim) - DEFAULT |
+| `embeddings_text_embedding_3_small` | OpenAI embeddings |
 
 ### Default Model Selection [models/models.py]
 
 ```python
-_DEFAULT_LLM = model_ollama_llama3
+_DEFAULT_LLM = model_ollama_gemma4
 _DEFAULT_EMBEDDINGS = embeddings_ollama_nomic
 
-def get_default_model() -> ChatOpenAI
-def get_default_embedding_model() -> OpenAIEmbeddings
+def get_default_model() -> ChatOllama:
+    return _DEFAULT_LLM
+
+def get_default_embedding_model() -> OllamaEmbeddings:
+    return _DEFAULT_EMBEDDINGS
 ```
 
 ### Rate Limiting Configuration [llm_output_parsing/langchain_output_parser.py]

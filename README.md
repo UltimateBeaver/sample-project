@@ -63,6 +63,17 @@ python main.py
 ---
 # Developer tips
 - When adding a new package, add the definition also in pyproject.toml
+- When changing models, please refer to [langchain_output_parser.py](./itext2kg_atom/itext2kg/llm_output_parsing/langchain_output_parser.py), updating PROVIDER_CONFIGS object. This is the default config for Ollama:
+```python
+    ProviderType.OLLAMA: ProviderConfig(
+        name="Ollama",
+        max_elements_per_batch=32,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
+        max_tokens_per_batch=12000,   # Increased to 12K per request (local inference, not API limits)
+        max_context_window=32768,   # Ollama context window
+        max_pending_requests=None,   # Ollama doesn't have explicit pending request limits
+        sleep_between_batches=0.1,   # 100ms between batches to prevent GPU thrashing
+    )
+```
 
 # Bugfix Checklist
 [] Self loop relationships without any sense

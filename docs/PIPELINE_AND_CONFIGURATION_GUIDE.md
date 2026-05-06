@@ -10,58 +10,37 @@
 
 ---
 
-## 🔴 Configuration Mismatches
+## ✅ Configuration Status
 
-### **CRITICAL: Type Annotation Mismatch in `models.py`**
+### Type Annotation Status - FIXED
 
 **Location:** `models/models.py` lines 16-19
 
-**Issue:**
+The type annotations are **now correct** and match the actual runtime behavior:
 ```python
-def get_default_embedding_model() -> OpenAIEmbeddings:
-    """Return the default embeddings model instance."""
-    return _DEFAULT_EMBEDDINGS
-```
-
-**Mismatch:** 
-- **Declared Return Type:** `OpenAIEmbeddings` (from `langchain_openai`)
-- **Actual Return Type:** `OllamaEmbeddings` (from `langchain_ollama`)
-- **Assigned Value:** `embeddings_ollama_nomic` (line 15)
-
-**Current Configuration State:**
-```python
-_DEFAULT_LLM        = model_ollama_llama3        # Local Ollama (Qwen 3.6 27B)
-_DEFAULT_EMBEDDINGS = embeddings_ollama_nomic    # Local Ollama (nomic-embed-text)
-```
-
-**Recommendation:**
-Fix the type annotation to reflect actual runtime type:
-```python
-from langchain_ollama import OllamaEmbeddings
+def get_default_model() -> ChatOllama:
+    """Return the default LLM model instance."""
+    return _DEFAULT_LLM
 
 def get_default_embedding_model() -> OllamaEmbeddings:
     """Return the default embeddings model instance."""
     return _DEFAULT_EMBEDDINGS
 ```
 
-Or use a Union type for flexibility:
+**Current Configuration:**
 ```python
-from typing import Union
-from langchain_openai import OpenAIEmbeddings
-from langchain_ollama import OllamaEmbeddings
-
-def get_default_embedding_model() -> Union[OpenAIEmbeddings, OllamaEmbeddings]:
-    """Return the default embeddings model instance."""
-    return _DEFAULT_EMBEDDINGS
+_DEFAULT_LLM        = model_ollama_gemma4        # Local Ollama (Gemma 4 model)
+_DEFAULT_EMBEDDINGS = embeddings_ollama_nomic    # Local Ollama (nomic-embed-text, 1024-dim)
 ```
 
-### **Configuration Dependencies**
+### Configuration Dependencies
 
 | Config Variable | Location | Type | Current Value | Purpose |
 |---|---|---|---|---|
-| `model_ollama_llama3` | `models_config.py:69` | `ChatOllama` | `qwen3.6:27b-q4_K_M` | LLM for entity/relation extraction |
-| `embeddings_ollama_nomic` | `models_config.py:109` | `OllamaEmbeddings` | `nomic-embed-text` | Entity/relation embeddings |
-| `ollama_base_url` | `env_config.py:9` | str | `http://localhost:11434/v1` | Ollama service endpoint |
+| `model_ollama_gemma4` | `models_config.py` | `ChatOllama` | Ollama Gemma 4 model | LLM for entity/relation extraction |
+| `embeddings_ollama_nomic` | `models_config.py` | `OllamaEmbeddings` | `nomic-embed-text` (1024-dim) | Entity/relation embeddings |
+| `ollama_base_url` | `env_config.py` | str | `http://localhost:11434/v1` | Ollama service endpoint |
+| `neo4j_uri` | `env_config.py` | str | `bolt://localhost:7687` | Neo4j database connection |
 
 ---
 
@@ -642,8 +621,8 @@ _DEFAULT_LLM        = model_llama3_3_70b          # Llama 3.3 70B
 _DEFAULT_EMBEDDINGS = embeddings_bge_large        # BAAI/bge-large
 
 # Option 3: Use Local Ollama (Current - requires local setup)
-_DEFAULT_LLM        = model_ollama_llama3         # Qwen 3.6 27B
-_DEFAULT_EMBEDDINGS = embeddings_ollama_nomic     # nomic-embed-text
+_DEFAULT_LLM        = model_ollama_gemma4         # Ollama Gemma 4 (default)
+_DEFAULT_EMBEDDINGS = embeddings_ollama_nomic     # nomic-embed-text (1024-dim)
 ```
 
 ---
