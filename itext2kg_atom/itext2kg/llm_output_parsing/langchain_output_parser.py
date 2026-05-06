@@ -67,7 +67,7 @@ PROVIDER_CONFIGS = {
         max_tokens_per_batch=12000,   # Increased to 12K per request (local inference, not API limits)
         max_context_window=32768,   # Ollama context window
         max_pending_requests=None,   # Ollama doesn't have explicit pending request limits
-        sleep_between_batches=0.1,   # 100ms between batches to prevent GPU thrashing
+        #sleep_between_batches=0.1,   # 100ms between batches to prevent GPU thrashing
     ),
     ProviderType.UNKNOWN: ProviderConfig(
         name="Unknown",
@@ -167,6 +167,18 @@ class LangchainOutputParser(LLMOutputParserInterface):
         logger.warning("   Using conservative defaults for unknown provider")
         return ProviderType.UNKNOWN
 
+    def _get_encoding(self, encoding_name: str):
+        """
+        Get a tiktoken encoding object by name.
+        
+        Args:
+            encoding_name: The name of the encoding (e.g., "cl100k_base", "o200k_base")
+        
+        Returns:
+            A tiktoken encoding object with an encode() method
+        """
+        return tiktoken.get_encoding(encoding_name)
+
     def count_tokens(self, text: str, encoding_name: str = "cl100k_base") -> int:
         """
         Count the number of tokens in a given text using provider-specific encoding.
@@ -223,6 +235,7 @@ class LangchainOutputParser(LLMOutputParserInterface):
 
         for prompt in prompts:
             token_count = self.count_tokens(prompt, encoding_name)
+            logger.debug(f"Prompt token count: {token_count} tokens (prompt length: {len(prompt)} chars)")
             
             # Check if single prompt exceeds context window
             if token_count > self.config.warning_threshold:
@@ -327,7 +340,7 @@ class LangchainOutputParser(LLMOutputParserInterface):
             logger.info(f"📋 Processing batch {i+1}/{len(batches)} with {len(batch)} requests ({self.config.name})")
             
             # For Mistral and Claude, use exponential backoff and extra careful processing
-            max_retries = 3 if self.provider_type in [ProviderType.MISTRAL, ProviderType.CLAUDE] else 2
+            max_retries = 3 if self.provider_type in [ProviderType.MISTRAL, ProviderType.CLAUDE, ProviderType.OLLAMA] else 2
             base_sleep = self.sleep_time
             
             start_batch_proc = time.time()

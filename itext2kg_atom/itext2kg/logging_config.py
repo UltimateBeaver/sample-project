@@ -60,7 +60,7 @@ def setup_logging(
     logging.getLogger("langchain_community").setLevel(logging.DEBUG)
     
     # Enable langchain debug mode (logs through logging system)
-    langchain.debug = True
+    langchain.debug = False
     
     # Prevent propagation to avoid duplicate logs
     root_logger.propagate = False
