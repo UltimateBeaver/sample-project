@@ -77,24 +77,28 @@ model_mistral_7b = ChatOpenAI(
 # --- Local / Ollama (using native Ollama API) -------------------
 model_ollama_gemma3 = ChatOllama(
     model="gemma3:1b",
+    num_ctx=32768,
     base_url=ollama_base_url,
     **_OLLAMA_DEFAULTS,
 )
 model_ollama_gemma4 = ChatOllama(
-    model="gemma4:e4b-32k",
+    model="gemma4:e4b",
     format="json",
+    num_ctx=32768,
     base_url=ollama_base_url,
     **_OLLAMA_DEFAULTS,
 )
 model_ollama_qwen2_5 = ChatOllama(
     model="qwen2.5:14b",
     format="json",
+    num_ctx=32768,
     base_url=ollama_base_url,
     **_OLLAMA_DEFAULTS,
 )
 model_ollama_gptoss = ChatOllama(
     model="gpt-oss:20b",
     format="json",
+    num_ctx=32768,
     base_url=ollama_base_url,
     **_OLLAMA_DEFAULTS,
 )
