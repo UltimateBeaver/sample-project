@@ -76,6 +76,6 @@ python main.py
 ```
 
 # Bugfix Checklist
-[] Self loop relationships without any sense
-[] Entities with empty names
-[] Redundant relationships
+- [ ] Self loop relationships without any sense
+- [ ] Entities with empty names
+- [ ] Redundant relationships
