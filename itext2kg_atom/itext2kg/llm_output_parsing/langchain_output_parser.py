@@ -331,7 +331,7 @@ class LangchainOutputParser(LLMOutputParserInterface):
                 logger.info(f"⏰ Estimated processing time: {estimated_time:.1f} seconds")
         elif self.provider_type == ProviderType.OLLAMA and len(batches) > 1:
             estimated_time = len(batches) * self.config.sleep_between_batches
-            logger.info(f"⏰ Estimated processing time: {estimated_time:.1f}s ({len(batches)} batches × {self.config.sleep_between_batches*1000:.0f}ms)")
+            logger.info(f"⏰ Estimated processing time: {estimated_time:.1f}s ({len(batches)} batches x {self.config.sleep_between_batches*1000:.0f}ms)")
 
         outputs = []
         batch_times = []
