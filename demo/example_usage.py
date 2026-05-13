@@ -81,12 +81,16 @@ async def main():
     
     # Step 4: Parse the Excel file
     print("\n⚙️  Step 4: Extracting atomic facts from paragraphs...")
+    print("   (Using parallel batch processing with batch_size=3)")
+    print("   (Applying post-processing: date normalization, deduplication, relevance filtering)")
     print("-" * 70)
     
     output_excel_path = "sample_news_with_factoids.xlsx"
     result_df = await parser.parse_excel(
         input_excel_path=sample_excel_path,
-        output_excel_path=output_excel_path
+        output_excel_path=output_excel_path,
+        batch_size=3,  # Process 3 paragraphs in parallel per batch
+        apply_post_processing=True  # Enable post-processing
     )
     
     # Step 5: Display the results
