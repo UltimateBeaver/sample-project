@@ -27,15 +27,22 @@ async def create_sample_excel(sample_path: str = "sample_news.xlsx"):
     sample_data = {
         'date': [
             datetime(2020, 1, 9).strftime('%Y-%m-%d'),
-            datetime(2020, 1, 15).strftime('%Y-%m-%d'),
-            datetime(2020, 2, 1).strftime('%Y-%m-%d'),
+            datetime(2020, 1, 23).strftime('%Y-%m-%d'),
+            datetime(2020, 1, 27).strftime('%Y-%m-%d'),
+            datetime(2020, 1, 28).strftime('%Y-%m-%d'),
+            datetime(2020, 1, 30).strftime('%Y-%m-%d'),
+            datetime(2020, 2, 6).strftime('%Y-%m-%d'),
+            datetime(2020, 2, 7).strftime('%Y-%m-%d'),
+            datetime(2020, 2, 9).strftime('%Y-%m-%d'),
+            datetime(2020, 2, 10).strftime('%Y-%m-%d'),
+            datetime(2020, 2, 11).strftime('%Y-%m-%d'),
         ],
         'lead_paragraph': [
             'HONG KONG — Chinese researchers say they have identified a new virus behind an illness that has infected dozens of people across Asia, setting off fears in a region that was struck by a deadly epidemic 17 years ago.',
             'The spread of a mysterious respiratory virus has prompted the authorities to limit travel in cities in China, including Wuhan, where the disease was first found last month. It has since spread across the nation and to at least 10 other countries.',
-            'U.S. stock futures are down sharply this morning on fears about the coronavirus outbreak. More below. (Want this in your inbox each morning? Sign up here.)'
-            'As President Trump’s lawyers open the third day of their defense today, an important question hangs over Washington: Will the Republican-controlled Senate agree to hear testimony from witnesses?.When I flew to China at the beginning of January to teach a three-week college class, the Wuhan coronavirus was barely on anyone’s radar. By the time I got back to New York last Friday, it was front page news around the world, with more than 800 cases in China and 26 deaths; by Monday, the total was at least 80 deaths.. .Hello. On today’s agenda: Apple is scheduled to report earnings today. (Want this in your inbox each morning? Sign up here.)'
-            'The World Health Organization declared a global health emergency on Thursday as the coronavirus outbreak spread well beyond China, where it emerged last month.'
+            'U.S. stock futures are down sharply this morning on fears about the coronavirus outbreak. More below. (Want this in your inbox each morning? Sign up here.)',
+            'As President Trump’s lawyers open the third day of their defense today, an important question hangs over Washington: Will the Republican-controlled Senate agree to hear testimony from witnesses?.When I flew to China at the beginning of January to teach a three-week college class, the Wuhan coronavirus was barely on anyone’s radar. By the time I got back to New York last Friday, it was front page news around the world, with more than 800 cases in China and 26 deaths; by Monday, the total was at least 80 deaths.. .Hello. On today’s agenda: Apple is scheduled to report earnings today. (Want this in your inbox each morning? Sign up here.)',
+            'The World Health Organization declared a global health emergency on Thursday as the coronavirus outbreak spread well beyond China, where it emerged last month.',
             'ANGERS, France — The relentless whir of machines echoing across a cavernous French factory floor this week is an unexpected result of the deadly virus that has nearly paralyzed cities in China and other parts of Asia. The company, Kolmi Hopen, happens to make an item that is suddenly one of the world’s hottest commodities: the medical face mask.',
             'This year’s edition of Art Basel Hong Kong, one of the most important destinations in the international art market calendar, has been canceled, with organizers citing the ‘‘sudden and widespread outbreak’’ of the coronavirus in China. The fair, held at the Hong Kong Convention and Exhibition Center, and featuring premier galleries from Asia and beyond, was to run March 17  through March 21....Japan already had several confirmed coronavirus cases when a giant cruise ship arrived at the port of Yokohama last week..An alliance between Saudi Arabia and Russia has helped prop up oil prices for the last three years. But the two big oil producers were not in perfect harmony this week, as they have tried to recalibrate production targets to cope with reduced demand from China, whose economy has been crippled by the coronavirus epidemic.',
             'BEIJING — The coronavirus epidemic in China surpassed a grim milestone on Sunday with a death toll that exceeds that of the SARS outbreak 17 years ago, a development that coincided with news that World Health Organization experts might soon be in the country to help stanch the crisis.',
