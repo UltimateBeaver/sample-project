@@ -44,6 +44,7 @@ remains flexible and optimized for extraction quality at runtime.
 import pandas as pd
 import asyncio
 import logging
+from itext2kg_atom.itext2kg.logging_config import get_logger
 import re
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -53,13 +54,6 @@ from difflib import SequenceMatcher
 from itext2kg_atom.itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg_atom.itext2kg.atom.models import AtomicFact
 
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -113,6 +107,8 @@ def convert_day_name_to_date(day_name: str, observation_date: str) -> Optional[s
 def normalize_relative_dates_in_fact(fact: str, observation_date: str) -> str:
     """
     Replace relative date references in a fact with absolute dates.
+    Supports patterns like "3 days ago", "1 week ago", "2 years ago", etc.
+    Replaces relative terms completely with absolute dates in natural format ("on YYYY-MM-DD").
     
     Args:
         fact: The atomic fact string
@@ -124,7 +120,46 @@ def normalize_relative_dates_in_fact(fact: str, observation_date: str) -> str:
     obs_date = datetime.strptime(observation_date, '%Y-%m-%d')
     normalized_fact = fact
     
-    # Pattern 1: "on Monday", "on Thursday", etc.
+    # Pattern 1: "X days/weeks/months/years ago" or "X days/weeks/months/years before"
+    # This pattern captures: "3 days ago", "1 week ago", "2 years ago", etc.
+    time_ago_pattern = r'\b(\d+)\s+(days?|weeks?|months?|years?)\s+(ago|before)\b'
+    matches = list(re.finditer(time_ago_pattern, normalized_fact, re.IGNORECASE))
+    
+    for match in reversed(matches):
+        quantity = int(match.group(1))
+        unit = match.group(2).lower()
+        direction = match.group(3).lower()
+        
+        # Normalize unit to plural form
+        if unit in ['day', 'week', 'month', 'year']:
+            unit = unit + 's'
+        
+        try:
+            # Calculate the target date
+            if unit == 'days':
+                target_date = obs_date - timedelta(days=quantity)
+            elif unit == 'weeks':
+                target_date = obs_date - timedelta(weeks=quantity)
+            elif unit == 'months':
+                # Handle month subtraction properly
+                month = obs_date.month - quantity
+                year = obs_date.year
+                while month <= 0:
+                    month += 12
+                    year -= 1
+                target_date = obs_date.replace(year=year, month=month)
+            elif unit == 'years':
+                target_date = obs_date.replace(year=obs_date.year - quantity)
+            else:
+                continue
+            
+            # Format as "on YYYY-MM-DD" to integrate naturally into the fact
+            replacement = f"on {target_date.strftime('%Y-%m-%d')}"
+            normalized_fact = normalized_fact[:match.start()] + replacement + normalized_fact[match.end():]
+        except Exception as e:
+            logger.warning(f"Could not convert relative date pattern '{match.group(0)}': {e}")
+    
+    # Pattern 2: "on Monday", "on Thursday", etc. (day names)
     day_pattern = r'\b(on\s+)?(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|yesterday|today|tomorrow)\b'
     matches = list(re.finditer(day_pattern, normalized_fact, re.IGNORECASE))
     
@@ -140,7 +175,7 @@ def normalize_relative_dates_in_fact(fact: str, observation_date: str) -> str:
                 replacement = f'on {converted_date}'
             normalized_fact = normalized_fact[:match.start()] + replacement + normalized_fact[match.end():]
     
-    # Pattern 2: "last month", "this month", "last week", "this week", etc.
+    # Pattern 3: "last month", "this month", "last week", "this week", etc.
     time_patterns = {
         r'\blast\s+month\b': lambda d: d.replace(day=1, month=(d.month - 1 or 12), year=(d.year - (1 if d.month == 1 else 0))).strftime('%Y-%m-%d'),
         r'\bthis\s+month\b': lambda d: d.replace(day=1).strftime('%Y-%m-%d'),
@@ -155,9 +190,16 @@ def normalize_relative_dates_in_fact(fact: str, observation_date: str) -> str:
         for match in reversed(matches):
             try:
                 converted_date = converter(obs_date)
-                normalized_fact = normalized_fact[:match.start()] + converted_date + normalized_fact[match.end():]
+                # Format as "on YYYY-MM-DD" for natural integration
+                replacement = f"on {converted_date}"
+                normalized_fact = normalized_fact[:match.start()] + replacement + normalized_fact[match.end():]
             except Exception as e:
                 logger.warning(f"Could not convert date pattern {match.group(0)}: {e}")
+    
+    # Pattern 4: Clean up temporal indication artifacts like "2020-01-28 (relative temporal indication)"
+    # Replace "YYYY-MM-DD (any text in parentheses)" with just "YYYY-MM-DD"
+    temporal_artifact_pattern = r'(\d{4}-\d{2}-\d{2})\s*\([^)]*\)'
+    normalized_fact = re.sub(temporal_artifact_pattern, r'\1', normalized_fact)
     
     return normalized_fact
 
@@ -200,6 +242,9 @@ def remove_duplicate_facts(facts: List[str], similarity_threshold: float = 0.8) 
     return unique_facts
 
 
+# TODO: replace the body of this function with a more sophisticated filtering mechanism that identifies and removes irrelevant facts, 
+# depending on the context of the paragraph and the content of the facts. 
+# This is a complex task that may potentially leverage the LLM for relevance scoring or classification of facts as relevant vs. irrelevant based on the original paragraph content.
 def filter_irrelevant_facts(facts: List[str], paragraph: str) -> List[str]:
     """
     Filter out facts that are too focused on minor descriptive details.
@@ -243,14 +288,6 @@ def filter_irrelevant_facts(facts: List[str], paragraph: str) -> List[str]:
     return filtered
 
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-
 class DocumentParser:
     """
     Parser class to convert raw news paragraphs into atomic facts using LLM.
@@ -265,6 +302,9 @@ class DocumentParser:
             llm_model: The language model instance (ChatOllama, ChatOpenAI, etc.)
             embeddings_model: Optional embeddings model for semantic operations
         """
+        global logger
+        logger = get_logger(__name__)
+        
         self.llm_model = llm_model
         self.embeddings_model = embeddings_model
         self.parser = LangchainOutputParser(
@@ -280,8 +320,10 @@ class DocumentParser:
         Uses the AtomicFact schema description as the foundation and adds:
         - Emphasis on EXHAUSTIVE extraction (all facts, including supporting details)
         - Better date conversion examples with explicit mappings
-        - Examples of what NOT to extract (irrelevant descriptive minutiae)
+        - Explicit examples of what NOT to extract (meta-information, noise, irrelevant details)
+        - Clear prohibition on extracting "The observation date is" facts
         - Instructions to prevent duplicate/near-duplicate facts
+        - Strict guidance on filtering generic descriptions vs. substantive information
         
         Note: This query is designed for the LLM at runtime. The AtomicFact schema 
         description serves a complementary role for JSON structure definition.
@@ -296,79 +338,119 @@ class DocumentParser:
         
         # Calculate example dates for the specific observation date
         yesterday = (obs_date - timedelta(days=1)).strftime('%Y-%m-%d')
+        three_days_ago = (obs_date - timedelta(days=3)).strftime('%Y-%m-%d')
         week_monday = (obs_date - timedelta(days=obs_date.weekday())).strftime('%Y-%m-%d')
         last_week_monday = (obs_date - timedelta(days=obs_date.weekday() + 7)).strftime('%Y-%m-%d')
         month_first = obs_date.replace(day=1).strftime('%Y-%m-%d')
         year_first = obs_date.replace(month=1, day=1).strftime('%Y-%m-%d')
         last_month_first = (obs_date.replace(day=1) - timedelta(days=1)).replace(day=1).strftime('%Y-%m-%d')
+        last_year_first = obs_date.replace(year=obs_date.year - 1, month=1, day=1).strftime('%Y-%m-%d')
         
         return f"""
-You are an expert EXHAUSTIVE atomic facts extraction engine. Your PRIMARY goal is to extract ALL distinct factual information from the input paragraph, including:
-- Main events and actions
-- Supporting context and background
-- Relationships between entities
-- Impact and consequences
-- Temporal information
+You are an expert EXHAUSTIVE and RELEVANT atomic facts extraction engine. Your PRIMARY goal is to extract ALL distinct factual information from the input paragraph.
 
-**Observation Date for Reference**: {observation_date}
 
-## CRITICAL: Be EXHAUSTIVE - Extract ALL Facts
+# ABSOLUTE PROHIBITIONS (NEVER extract these):
 
-DO NOT filter facts based on perceived "importance". Extract:
-✅ Main events (e.g., "X announced Y")
-✅ Supporting facts (e.g., "The announcement occurred because of Z")
-✅ Background context (e.g., "This is the first time X has done Y")
-✅ Entity descriptions and roles (e.g., "X is a company", "Y is located in Z")
-✅ Causal relationships (e.g., "A happened because of B")
-✅ Temporal context (e.g., "This follows event C from last week")
+1. **NEVER include meta-information about the observation date itself:**
+   - "The observation date is {observation_date}"
+   - "Today's date is {observation_date}"
+   - "On {observation_date}, the observation date is being recorded"
+    The observation_date is ONLY used for temporal normalization, NOT as content to extract.
 
-❌ DO NOT limit extraction—get EVERYTHING mentioned in the text.
+2. **NEVER extract purely generic corporate/motivational descriptions without specific content:**
+   - "Company X is focused on innovation and excellence"
+   - "The organization is dedicated to building a better future"
+   - "Y is committed to customer satisfaction and continuous improvement"
 
-## Key Rules:
+3. **NEVER extract unrelated noisy information (things mentioned in passing, meta-commentary or promotional content):**
+   - "Discover the top 5 tools for remote workers."
+   - "Click here for a deeper understanding of the market shifts."
+   - "This content is purely for informational purposes and should not be taken as legal or medical advice"
+
+4. **NEVER extract irrelevant information that is not directly related to the main news:**
+    ### Example 1:
+    > INPUT: "While I was eating a sandwich, I heard from the TV that the town's jewelry store was robbed this morning."
+    > RELEVANT FACT: "The town's jewelry store was robbed this morning."
+    > NOISE (DO NOT EXTRACT): "I was eating a sandwich", "I heard from the TV"
+    > REASONING: The speaker's meal and the source of information (TV) do not change the facts of the robbery, which is the actual news.
+
+    ### Example 2:
+    > INPUT: "The CEO of Company X, while enjoying a cup of coffee, announced a new product line yesterday."
+    > RELEVANT FACT: "The CEO of Company X announced a new product line yesterday."
+    > NOISE (DO NOT EXTRACT): "while enjoying a cup of coffee"
+    > REASONING: The CEO's activity of enjoying a cup of coffee does not change the fact of the announcement, which is the main news.
+
+    ### Example 3:
+    > INPUT: "Mark flew to Paris to attend a conference where the Minister announced a new 10% tax on digital services."
+    > RELEVANT FACT: "The Minister announced a new 10% tax on digital services."
+    > NOISE (DO NOT EXTRACT): "Mark flew to Paris to attend a conference"
+    > REASONING: The speaker's travel details and the specific event he was attending are "logistical noise." The actual news is the tax announcement.
+
+    ### Example 4:
+    > INPUT: "I was walking my dog in the park when I noticed that the city has finally started the bridge reconstruction project."
+    > RELEVANT FACT: "The city has started the bridge reconstruction project."
+    > NOISE (DO NOT EXTRACT): "I was walking my dog in the park", "I noticed that"
+    > REASONING: The speaker’s activity (walking a dog) and their internal state (noticing something) are irrelevant to the status of the bridge.
+
+5. **NEVER extract the same information multiple times in different phrasings:**
+   - If you extract "Event X happened", do NOT also extract "X is something that happened"
+
+   
+# WHAT TO EXTRACT (EXHAUSTIVELY):
+
+- **Main events and actions**: "X announced Y", "Z declared an emergency"
+- **Supporting facts**: "The event occurred because of...", "It impacts..."
+- **Background context**: "This is the first time X did Y", "Historical precedent..."
+- **Entity descriptions (ONLY if specific/informative)**: "Company X produces cars", "City Y has population Z"
+- **Causal relationships**: "A happened because of B"
+- **Relationships and connections**: "X is affiliated with Y", "Z works for company W"
+- **Quantitative information**: "X increased by 40%", "Z people were affected"
+- **Named entities and roles**: "CEO John Smith", "Organization XYZ supplies sport equipment"
+- **Impact and consequences**: "The policy will affect X", "Y resulted in Z"
+
+
+## KEY RULES:
 
 ### 1. ATOMICITY
 - Each atomic fact must contain exactly ONE piece of information or relationship
-- Break down compound/complex sentences into single-fact statements
-- Remove redundancies ONLY (exact duplicates), not supporting details
-- Example: "Company X announced a new product and hired 50 people" → Two facts:
+- Break down compound sentences into single-atomic facts statements
+Example: "Company X announced a product and hired 50 people" → Two facts:
   - "Company X announced a new product"
   - "Company X hired 50 people"
 
-### 2. DECONTEXTUALIZATION  
-- Replace ALL pronouns (he, she, it, they, this, that) with full entity names
-- Include necessary modifiers so each fact is understandable in isolation
+### 2. DECONTEXTUALIZATION
+- Replace ALL pronouns (he, she, it, they) with full entity names
 - Example: "John joined the company. He started on Monday" → "John joined the company on Monday"
 
-### 3. TEMPORAL NORMALIZATION - CRITICAL
-Convert ALL relative time references to absolute dates using observation_date = {observation_date}:
+### 3. TEMPORAL NORMALIZATION
+Convert ALL relative time references to absolute dates:
 
 REFERENCE EXAMPLES FOR {observation_date}:
-- "today" → {observation_date}
-- "yesterday" → {yesterday}
-- "this week" → {week_monday} (Monday of this week)
-- "last week" → {last_week_monday} (Monday of last week)
-- "this month" → {month_first} (1st of this month)
-- "last month" → {last_month_first} (1st of last month)
-- "this year" → {year_first} (Jan 1st of this year)
-- "last year" → {(obs_date.replace(year=obs_date.year-1, month=1, day=1)).strftime('%Y-%m-%d')} (Jan 1st of last year)
-- Named days (Monday, Thursday, etc.) → the most recent occurrence of that day
-- "last month" → date exactly 1 month prior
-- Keep explicit dates as-is (e.g., "June 18, 2024" stays "June 18, 2024")
+- "today" → on {observation_date}
+- "yesterday" → on {yesterday}
+- "3 days ago" → on {three_days_ago}
+- "this week" (Monday) → on {week_monday}
+- "last week" (Monday) → on {last_week_monday}
+- "this month" (1st) → on {month_first}
+- "last month" (1st) → on {last_month_first}
+- "this year" (Jan 1st) → on {year_first}
+- "last year" (Jan 1st) → on {last_year_first}
+- Named days ("Monday", "Thursday") → on YYYY-MM-DD (most recent occurrence)
+- Keep explicit dates unchanged (e.g., "June 18, 2024" stays "June 18, 2024")
 
-NEVER include relative terms like "today", "yesterday", "last week" in FINAL facts.
-Position time references naturally within facts (usually near the verb/action).
+**IMPORTANT**: Replace relative terms COMPLETELY. Final facts should have "on YYYY-MM-DD", never "on YYYY-MM-DD (yesterday)" or "YYYY-MM-DD (relative reference)"
 
 ### 4. END ACTIONS
-- If the text indicates the end of a role or action (e.g., "leaving a position", "resigned", "ended"), be explicit
-- Capture: WHAT ended, WHO/WHAT ended it, WHEN it ended
-- Example: "The CEO resigned yesterday" → "The CEO resigned on {yesterday}"
+- Explicitly capture role/action termination with timestamp
+- Example: "CEO resigned yesterday" → "CEO resigned on {yesterday}"
 
-### 5. AVOIDING IRRELEVANT MINUTIAE
-✅ INCLUDE: Facts about companies, people, events, policies, impacts
-❌ EXCLUDE: Purely descriptive stylistic details (e.g., "The machines are whirring loudly")
+### 5. AVOIDING IRRELEVANT INFORMATION
+- INCLUDE: Facts about companies, people, events, policies, impacts
+- EXCLUDE: Purely descriptive stylistic details that do not add substantive information about entities/events
 
-If a description is about a specific named entity and provides information (e.g., "Kolmi Hopen makes face masks"), INCLUDE it.
-If a description is generic and non-informative (e.g., "The factory floor has machines"), EXCLUDE it.
+If a description is about a specific named entity and provides information (e.g., "Company XYZ produces cars"), INCLUDE it.
+If a description is generic and non-informative (e.g., "The company XYZ is focused on innovation, excellence, and building a better future through technology"), EXCLUDE it.
 
 ### 6. DEDUPLICATION GUIDANCE
 - Prefer facts mentioning SPECIFIC NAMES/ENTITIES over generic versions
@@ -376,43 +458,47 @@ If a description is generic and non-informative (e.g., "The factory floor has ma
 - AVOID DUPLICATE: "The company expanded its operations in California" (already covered by the GOOD fact)
 - Extract the more comprehensive fact with entity names rather than generic versions
 
+### 6. 
+
 ## Example of EXHAUSTIVE Extraction
 
-**Example 1: Company Announcement (observation_date = 2020-05-15):**
-"TOKYO — Tech company XYZ announced a major breakthrough in renewable energy yesterday. The innovation could reduce power consumption by 40%. Industry experts believe this represents a significant step forward for sustainable technology."
+**Example 1:**
+"Observation date: 2020-05-15 TOKYO — Tech company XYZ announced a major breakthrough in renewable energy yesterday. The innovation could reduce power consumption by 40%. Industry experts believe this represents a significant step forward for sustainable technology."
 
 **Output (ALL facts):**
 - Tech company XYZ announced a major breakthrough in renewable energy on 2020-05-14
 - The renewable energy breakthrough could reduce power consumption by 40%
 - Industry experts believe the announcement represents a significant step forward for sustainable technology
 
-**Example 2: Regulatory Change (observation_date = 2020-03-20):**
-"BRUSSELS — The European Union implemented new data protection regulations on Thursday. Companies have 60 days to comply with the rules. Financial penalties for non-compliance could reach up to 10 million euros."
+**Example 2:**
+"Observation date: 2020-03-20 The European Union implemented new data protection regulations on Thursday. Companies have 60 days to comply with the rules. Financial penalties for non-compliance could reach up to 10 million euros."
 
 **Output:**
 - The European Union implemented new data protection regulations on 2020-03-19
 - Companies have 60 days to comply with the new regulations (deadline: around 2020-05-18)
 - Financial penalties for non-compliance with the regulations could reach up to 10 million euros
-- The regulations were implemented by the European Union
 
-**Example 3: Natural Disaster Impact (observation_date = 2020-08-10):**
-"MANILA — A typhoon struck the region last week, causing flooding in three provinces. The disaster displaced thousands of residents. Emergency services continue relief operations."
+**Example 3:**
+"Observation date: 2020-08-10 MANILA — A typhoon struck the region last week, causing flooding in three provinces. The disaster displaced thousands of residents. Emergency services continue relief operations."
 
 **Output:**
-- A typhoon struck the region around 2020-08-03 (last week from 2020-08-10)
+- A typhoon struck the region around 2020-08-03
 - The typhoon caused flooding in three provinces
 - Thousands of residents were displaced by the typhoon
 - Emergency services continue relief operations following the typhoon
+
+## Input Format
+A string made with this format: "Observation date: YYYY-MM-DD. [raw news paragraph text]"
 
 ## Output Format
 Return ONLY the list of atomic facts. Each fact should be:
 - Concise and factual
 - Temporally explicit (include normalized dates where relevant)
 - Decontextualized (no pronouns)
-- Unique (but keep different perspectives on the same event)
-- Related to substantive content (not trivial descriptive details)
+- Unique (no near-duplicates)
+- Substantively informative (not generic marketing language)
 
-REMEMBER: Your goal is EXHAUSTIVE extraction. Extract EVERY distinct piece of information you find in the text.
+MOST IMPORTANT: Extract EXHAUSTIVELY but CLEANLY. Skip noisy/meta-information and generic descriptions, but capture ALL substantive facts about events, entities, and relationships.
 """
     
     async def extract_atomic_facts_from_paragraphs_batch(
@@ -464,14 +550,14 @@ REMEMBER: Your goal is EXHAUSTIVE extraction. Extract EVERY distinct piece of in
                 
                 # Apply post-processing
                 if apply_post_processing and facts:
-                    # Step 1: Normalize dates
+                    # Step 1: Normalize dates and clean temporal artifacts
                     facts = [normalize_relative_dates_in_fact(fact, obs_date) for fact in facts]
                     
                     # Step 2: Remove duplicates
                     facts = remove_duplicate_facts(facts, similarity_threshold=0.8)
                     
                     # Step 3: Filter irrelevant facts
-                    facts = filter_irrelevant_facts(facts, paragraphs[i])
+                    #facts = filter_irrelevant_facts(facts, paragraphs[i])
                 
                 all_facts.append(facts)
             
@@ -511,6 +597,21 @@ REMEMBER: Your goal is EXHAUSTIVE extraction. Extract EVERY distinct piece of in
         
         logger.info(f"Loaded {len(df)} rows from Excel file")
         
+        # Create the combined column 'lead_paragraph_observation_date'
+        logger.info("Creating 'lead_paragraph_observation_date' column...")
+        df['lead_paragraph_observation_date'] = df.apply(
+            lambda row: f"Observation date: {row['date']}. {row['lead_paragraph']}",
+            axis=1
+        )
+        logger.info("✅ Combined column created successfully")
+
+        # Pre-processing
+        # Normalize each temporal reference strings in the 'lead_paragraph_observation_date' column to ensure consistent formatting for the LLM
+        # df['lead_paragraph_observation_date'] = [normalize_relative_dates_in_fact(fact, df.loc[idx, 'date']) for idx, fact in enumerate(df['lead_paragraph_observation_date'])]
+        # Date normalization should be done in post processing after extraction
+        # i.e. this year's edition of Art Basel -> yyyy-mm-dd will translate the following fact into:
+        # "Art Basel Hong Kong, an important destination in the international art market calendar, was canceled on 2020-01-01's edition"
+
         # Initialize the factoids_g_truth column
         df['factoids_g_truth'] = None
         factoids_list = [[] for _ in range(len(df))]
@@ -522,7 +623,7 @@ REMEMBER: Your goal is EXHAUSTIVE extraction. Extract EVERY distinct piece of in
         
         for idx, row in df.iterrows():
             date = row['date']
-            paragraph = row['lead_paragraph']
+            paragraph = row['lead_paragraph_observation_date']
             
             # Convert date to string if needed
             if isinstance(date, datetime):

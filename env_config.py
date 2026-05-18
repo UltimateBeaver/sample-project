@@ -13,3 +13,7 @@ ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 neo4j_uri = os.getenv("NEO4J_URI")
 neo4j_username = os.getenv("NEO4J_USERNAME")
 neo4j_password = os.getenv("NEO4J_PASSWORD")
+
+# Static constants
+doc_parser_input_excel_path = "./data/sample_news.xlsx"
+doc_parser_output_excel_path = "./data/sample_news_with_factoids.xlsx"

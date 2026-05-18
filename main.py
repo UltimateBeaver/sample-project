@@ -2,6 +2,7 @@ import pandas as pd
 import ast
 import asyncio
 import logging
+from document_parser.doc_parser import DocumentParser
 from models.models import *
 from sanity_checks.test_config import validate_config
 
@@ -34,6 +35,47 @@ def to_dictionary(df:pd.DataFrame, max_elements: int | None = 20):
         }
 
 
+## ------------- Document parsing into atomic facts ------------- ##
+async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
+    # Covert xlsx file to pkl format
+    parser = DocumentParser(llm_model=base_llm_model)
+    result_df = await parser.parse_excel(
+        input_excel_path=doc_parser_input_excel_path,
+        output_excel_path=doc_parser_output_excel_path,
+        batch_size=10,  # Process 10 paragraphs in parallel per batch
+        apply_post_processing=True  # Enable post-processing
+    )
+    print("\n" + "=" * 70)
+    print("📊 EXTRACTION RESULTS")
+    print("=" * 70)
+    
+    for idx, row in result_df.iterrows():
+        print(f"\n📅 Date: {row['date']}")
+        print(f"📄 Paragraph: {row['lead_paragraph'][:100]}...")
+        print(f"✨ Extracted Atomic Facts ({len(row['factoids_g_truth'])} facts):")
+        
+        if isinstance(row['factoids_g_truth'], list) and len(row['factoids_g_truth']) > 0:
+            for i, fact in enumerate(row['factoids_g_truth'], 1):
+                print(f"   {i}. {fact}")
+        else:
+            print("   [No facts extracted]")
+    
+    print("\n" + "=" * 70)
+    print(f"✅ Results saved to: {doc_parser_output_excel_path}")
+    print("=" * 70)
+    
+    # Display summary statistics
+    print("\n📈 SUMMARY STATISTICS")
+    print("-" * 70)
+    total_factoids = sum(len(facts) if isinstance(facts, list) else 0 
+                        for facts in result_df['factoids_g_truth'])
+    print(f"Total rows processed: {len(result_df)}")
+    print(f"Total atomic facts extracted: {total_factoids}")
+    print(f"Average factoids per paragraph: {total_factoids / len(result_df):.1f}")
+
+    return result_df
+
+
 async def main():
     
     # Initialize default logging configuration
@@ -49,9 +91,19 @@ async def main():
         logger.error("Configuration validation failed. Exiting.")
         return
     
+
+    #df_atomic_facts = await parse_news_paragraphs_into_atomic_facts()
+    #df_atomic_facts.to_pickle(doc_parser_output_excel_path.replace(".xlsx", ".pkl"))
+
     # Load the 2020-COVID-NYT dataset pickle (only 10 rows for testing)
     #news_covid = pd.read_pickle("./itext2kg-1.0.0/datasets/atom/nyt_news/2020_nyt_COVID_last_version_ready.pkl")
-    news_covid = pd.read_pickle("./small_pickle.pkl")
+    news_covid = pd.read_pickle("./data/small_pickle.pkl")
+    #news_covid = pd.read_pickle(doc_parser_output_excel_path.replace(".xlsx", ".pkl"))
+
+    """
+    Todo: When reading small_pickle.pkl everything works fine.
+    When reading the df_atomic_facts.to_pickle() I get tons of warnings for failed JSON parsing.
+    """
 
     # Convert the dataframe into the required dictionary format
     news_covid_dict = to_dictionary(news_covid)

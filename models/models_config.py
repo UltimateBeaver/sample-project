@@ -84,22 +84,28 @@ model_ollama_gemma3 = ChatOllama(
 model_ollama_gemma4 = ChatOllama(
     model="gemma4:e4b",
     format="json",
-    num_ctx=32768,
+    num_ctx=16384,
     base_url=ollama_base_url,
+    #top_k=30,       # More restrictive for better JSON quality
+    #top_p=0.85,     # Slightly lower for focused output
     **_OLLAMA_DEFAULTS,
 )
+
 model_ollama_qwen2_5 = ChatOllama(
     model="qwen2.5:14b",
     format="json",
-    num_ctx=32768,
+    num_ctx=16384,
     base_url=ollama_base_url,
     **_OLLAMA_DEFAULTS,
 )
 model_ollama_gptoss = ChatOllama(
     model="gpt-oss:20b",
     format="json",
-    num_ctx=32768,
+    num_ctx=4096,
     base_url=ollama_base_url,
+    repeat_penalty=1.2, # Added: Prevents the "infinite loop"
+    top_k=40,           # Added: Helps focus the model
+    top_p=0.9,          # Added: Keeps output logical
     **_OLLAMA_DEFAULTS,
 )
 

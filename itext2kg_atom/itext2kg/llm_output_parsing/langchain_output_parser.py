@@ -1,6 +1,7 @@
 import time
 import openai
 import logging
+import json
 from typing import Union, List, Any, Optional
 import numpy as np
 import tiktoken
@@ -63,9 +64,12 @@ PROVIDER_CONFIGS = {
     ),
     ProviderType.OLLAMA: ProviderConfig(
         name="Ollama",
-        max_elements_per_batch=32,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
-        max_tokens_per_batch=12000,   # Increased to 12K per request (local inference, not API limits)
-        max_context_window=32768,   # Ollama context window
+        # OLD CONFIG # max_elements_per_batch=32,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
+        # OLD CONFIG # max_tokens_per_batch=12000,   # Increased to 12K per request (local inference, not API limits)
+        # OLD CONFIG # max_context_window=32768,   # Ollama context window
+        max_elements_per_batch=8,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
+        max_tokens_per_batch=8192,   # Increased to 12K per request (local inference, not API limits)
+        max_context_window=16384,   # Ollama context window
         max_pending_requests=None,   # Ollama doesn't have explicit pending request limits
         #sleep_between_batches=0.1,   # 100ms between batches to prevent GPU thrashing
     ),
@@ -347,6 +351,24 @@ class LangchainOutputParser(LLMOutputParserInterface):
             
             for attempt in range(max_retries + 1):
                 try:
+                    # For Ollama, test with first prompt to capture raw output for debugging
+                    if self.provider_type == ProviderType.OLLAMA and attempt == 0:
+                        try:
+                            logger.debug(f"   Testing raw model output with first prompt in batch {i+1}...")
+                            raw_response = await self.model.ainvoke(batch[0])
+                            raw_content = raw_response.content if hasattr(raw_response, 'content') else str(raw_response)
+                            logger.debug(f"   Raw model output (first {200} chars): {raw_content[:200]}")
+                            
+                            # Try to parse as JSON to see if it's valid
+                            try:
+                                json.loads(raw_content)
+                                logger.debug(f"   ✓ Raw output is valid JSON")
+                            except json.JSONDecodeError as je:
+                                logger.warning(f"   ✗ Raw output is NOT valid JSON: {str(je)[:100]}")
+                                logger.debug(f"   Full raw output: {raw_content}")
+                        except Exception as test_e:
+                            logger.debug(f"   Raw output test failed: {test_e}")
+                    
                     batch_outputs = await structured_llm.abatch(batch)
                     outputs.extend(batch_outputs)
                     break  # Success, exit retry loop
@@ -377,6 +399,35 @@ class LangchainOutputParser(LLMOutputParserInterface):
                     
                 except Exception as e:
                     error_message = str(e).lower()
+                    full_error = str(e)
+                    
+                    # Check for JSON parsing errors (especially from Ollama)
+                    is_json_error = (
+                        "json" in error_message or 
+                        "output_parsing_failure" in error_message or
+                        "parse" in error_message
+                    )
+                    
+                    if is_json_error and self.provider_type == ProviderType.OLLAMA:
+                        # Log detailed info about JSON errors for Ollama
+                        logger.warning(f"⚠️  JSON/Schema parsing error in batch {i+1}, attempt {attempt+1}/{max_retries+1}")
+                        logger.debug(f"   Full error: {full_error}")
+                        
+                        # For Ollama, JSON errors might be due to model output quality or schema mismatch
+                        # Try with more aggressive retries
+                        if attempt < max_retries:
+                            sleep_time = base_sleep * (1.5 ** attempt)  # Milder backoff for local models
+                            logger.warning(f"   Retrying with {sleep_time}s delay (attempt {attempt+1}/{max_retries+1})")
+                            logger.info(f"   💡 Tip: If errors persist, consider:")
+                            logger.info(f"      1. Reducing batch size to ensure model can generate valid JSON")
+                            logger.info(f"      2. Checking if Ollama output matches the expected schema")
+                            logger.info(f"      3. Using format='json' to enforce JSON output from Ollama")
+                            time.sleep(sleep_time)
+                            continue
+                        else:
+                            logger.error(f"💥 Schema/JSON parsing failed for batch {i+1} after {max_retries} attempts")
+                            logger.error(f"   Error details: {full_error}")
+                            raise
                     
                     # Check for Mistral-specific rate limit errors
                     is_mistral_rate_limit = (

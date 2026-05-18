@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from models.models import get_default_model
 
 # Import the document parser
-from demo.doc_parser import DocumentParser
+from document_parser.doc_parser import DocumentParser
 
 
 async def create_sample_excel(sample_path: str = "sample_news.xlsx"):
@@ -89,7 +89,7 @@ async def main():
     result_df = await parser.parse_excel(
         input_excel_path=sample_excel_path,
         output_excel_path=output_excel_path,
-        batch_size=3,  # Process 3 paragraphs in parallel per batch
+        batch_size=10,  # Process 10 paragraphs in parallel per batch
         apply_post_processing=True  # Enable post-processing
     )
     
