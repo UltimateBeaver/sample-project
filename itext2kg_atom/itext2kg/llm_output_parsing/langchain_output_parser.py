@@ -39,12 +39,18 @@ class ProviderConfig:
 # Provider-specific configurations
 PROVIDER_CONFIGS = {
     ProviderType.OPENAI: ProviderConfig(
-        name="OpenAI",
-        max_elements_per_batch=40,   # Conservative batch size
-        max_tokens_per_batch=8000,   # Conservative token limit
-        max_context_window=128000,   # context window
-        max_pending_requests=None,   # OpenAI doesn't have explicit pending request limits
-        sleep_between_batches=2.0,   # Short delay + let OpenAI's built-in rate limiting handle the rest
+        # OLD CONFIG # name="OpenAI",
+        # OLD CONFIG # max_elements_per_batch=40,   # Conservative batch size
+        # OLD CONFIG # max_tokens_per_batch=8000,   # Conservative token limit
+        # OLD CONFIG # max_context_window=128000,   # context window
+        # OLD CONFIG # max_pending_requests=None,   # OpenAI doesn't have explicit pending request limits
+        # OLD CONFIG # sleep_between_batches=2.0,   # Short delay + let OpenAI's built-in rate limiting handle the rest
+        name="LM Studio (Local)",
+        max_elements_per_batch=1,    # Process ONE request at a time to avoid memory issues
+        max_tokens_per_batch=4096,   # Very conservative token limit
+        max_context_window=16384,    # Typical for local models
+        max_pending_requests=None,
+        sleep_between_batches=0.5,   # Small delay between requests
     ),
     ProviderType.MISTRAL: ProviderConfig(
         name="Mistral",

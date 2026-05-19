@@ -109,6 +109,16 @@ model_ollama_gptoss = ChatOllama(
     **_OLLAMA_DEFAULTS,
 )
 
+# --- Local / LMstudio (using OpenAI API) -------------------
+# model_lmstudio_gemma4 = ChatOpenAI(
+#     api_key=openai_api_key,
+#     base_url=openai_api_base,
+#     model="google/gemma-4-e4b",  # Use exact model identifier from LM Studio
+#     #model_kwargs={"response_format": {"type": "json_object"}},  # Ensure LM Studio returns valid JSON
+#     streaming=False, # CRITICAL: Disable streaming explicitly to avoid JSON parsing issues with incomplete output
+#     temperature=0,
+# )
+
 # ---------------------------------------------------------------------------
 # Embedding models
 # ---------------------------------------------------------------------------
@@ -142,3 +152,10 @@ embeddings_ollama_nomic = OllamaEmbeddings(
     #embed_batch_size=32,                # Batch embeddings for efficiency
     #keep_alive="5m",                    # Keep model in memory
 )
+
+# --- Local / LMstudio embeddings (using OpenAI API) -----------
+# embeddings_lmstudio_nomic = OpenAIEmbeddings(
+#     api_key=openai_api_key,
+#     base_url=openai_api_base,
+#     model="text-embedding-nomic-embed-text-v2-moe",  # Use exact model identifier from LM Studio
+# )

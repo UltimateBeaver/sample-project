@@ -5,37 +5,43 @@ from itext2kg_atom.itext2kg.logging_config import get_logger
 from models.models import get_default_model, get_default_embedding_model
 from env_config import *
 
-from urllib.parse import urljoin
 import requests
 
 logger = get_logger(__name__)
 
-def validate_ollama_connection():
-    """Validate Ollama service is running and models are available."""
+def get_model_base_url(model):
+    """Return the configured base URL for a LangChain ChatOpenAI/ChatOllama model."""
+    if hasattr(model, "base_url") and getattr(model, "base_url"):
+        return getattr(model, "base_url")
+
+    if hasattr(model, "model_dump"):
+        dump = model.model_dump()
+        base_url = dump.get("openai_api_base") or dump.get("base_url")
+        if base_url:
+            return base_url
+
+        if dump.get("openai_api_key"):
+            return "https://api.openai.com"
+
+    raise RuntimeError(
+        f"Cannot determine a reachable base URL for model type {type(model).__name__}."
+    )
+
+
+def validate_model_base_url_connection(model, timeout=5):
+    """Validate that a LangChain model's base URL is reachable."""
+    base_url = get_model_base_url(model)
     try:
-        response = requests.get(
-            urljoin(ollama_base_url, "v1/models"),
-            timeout=5
-        )
-        response.raise_for_status()
-        models_list = response.json().get("data", [])
-        available_models = [m["id"] for m in models_list]
-        required_models = [get_default_model().model, get_default_embedding_model().model]
-        missing = [m for m in required_models if m not in available_models]
-        
-        if missing:
+        response = requests.get(base_url, timeout=timeout)
+        if response.status_code >= 500:
             raise RuntimeError(
-                f"Missing Ollama models: {missing}\n"
-                f"Available: {available_models}\n"
-                f"Run: ollama pull {' && ollama pull '.join(missing)}"
+                f"Service at {base_url} returned status code {response.status_code}."
             )
-        
         return True
-    except Exception as e:
+    except requests.RequestException as e:
         raise RuntimeError(
-            f"Cannot connect to Ollama at {ollama_base_url}\n"
-            f"Error: {e}\n"
-            f"Make sure Ollama is running: ollama serve"
+            f"Cannot connect to {type(model).__name__} base_url at {base_url}\n"
+            f"Error: {e}"
         )
 
 async def validate_models_config():
@@ -60,6 +66,7 @@ async def validate_models_config():
         logger.debug(f"✅ LLM call successful: {response.content[:50]}")
     except Exception as e:
         logger.error(f"❌ LLM call failed: {e}")
+        raise RuntimeError()
     
     # Test embeddings call
     try:
@@ -67,10 +74,12 @@ async def validate_models_config():
         logger.debug(f"✅ Embeddings call successful: shape {len(emb_result)}")
     except Exception as e:
         logger.error(f"❌ Embeddings call failed: {e}")
+        raise RuntimeError()
 
 async def validate_config():
     try:
-        validate_ollama_connection()
+        validate_model_base_url_connection(get_default_model())
+        validate_model_base_url_connection(get_default_embedding_model())
         await validate_models_config()
         return True
     except RuntimeError as e:

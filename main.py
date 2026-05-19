@@ -98,6 +98,7 @@ async def main():
     # Load the 2020-COVID-NYT dataset pickle (only 10 rows for testing)
     #news_covid = pd.read_pickle("./itext2kg-1.0.0/datasets/atom/nyt_news/2020_nyt_COVID_last_version_ready.pkl")
     news_covid = pd.read_pickle("./data/small_pickle.pkl")
+
     #news_covid = pd.read_pickle(doc_parser_output_excel_path.replace(".xlsx", ".pkl"))
 
     """

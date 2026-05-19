@@ -1,3 +1,5 @@
+from typing import Union
+
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from .models_config import *
 
@@ -9,11 +11,11 @@ _DEFAULT_LLM        = model_ollama_gemma4  # local Ollama (with format="json" fo
 _DEFAULT_EMBEDDINGS = embeddings_ollama_nomic    # local Ollama
 
 
-def get_default_model() -> ChatOllama:
+def get_default_model() -> Union[ChatOllama, ChatOpenAI]:
     """Return the default LLM model instance."""
     return _DEFAULT_LLM
 
 
-def get_default_embedding_model() -> OllamaEmbeddings:
+def get_default_embedding_model() -> Union[OllamaEmbeddings, OpenAIEmbeddings]:
     """Return the default embeddings model instance."""
     return _DEFAULT_EMBEDDINGS
