@@ -196,7 +196,7 @@ class Atom:
         
         atomic_kgs = await asyncio.gather(*list(map(
             self.build_atomic_kg_from_quintuples, 
-            [relation.relationships for relation in relationships], 
+            [relation.relationships if relation is not None else [] for relation in relationships], 
             [entity_name_weight for _ in relationships], 
             [entity_label_weight for _ in relationships],
             [rel_threshold for _ in relationships],

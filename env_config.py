@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 # API keys
 openai_api_key = os.getenv("OPENAI_API_KEY")
+llamacpp_embed_base = os.getenv("LLAMACPP_EMBED_BASE")
 openai_api_base = os.getenv("OPENAI_API_BASE")          # e.g. https://openrouter.ai/api/v1
 together_api_base = os.getenv("TOGETHER_API_BASE")
 together_api_key = os.getenv("TOGETHER_API_KEY")

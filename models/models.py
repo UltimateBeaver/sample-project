@@ -7,8 +7,8 @@ from .models_config import *
 # Default getters  (used by main.py)
 # ---------------------------------------------------------------------------
 # Change these two lines to switch the active configuration globally.
-_DEFAULT_LLM        = model_ollama_gemma4  # local Ollama (with format="json" for valid JSON output)
-_DEFAULT_EMBEDDINGS = embeddings_ollama_nomic    # local Ollama
+_DEFAULT_LLM        = model_llamacpp_gemma4  # local Ollama (with format="json" for valid JSON output)
+_DEFAULT_EMBEDDINGS = embeddings_llamacpp_nomic    # local Ollama
 
 
 def get_default_model() -> Union[ChatOllama, ChatOpenAI]:

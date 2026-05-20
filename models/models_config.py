@@ -109,6 +109,14 @@ model_ollama_gptoss = ChatOllama(
     **_OLLAMA_DEFAULTS,
 )
 
+# --- Local / Native Llama.cpp Server --------------------------------------
+model_llamacpp_gemma4 = ChatOpenAI(
+    api_key=openai_api_key,
+    base_url=openai_api_base,
+    model="gemma4",  # The server ignores this string, but ChatOpenAI requires it
+    temperature=0,
+)
+
 # --- Local / LMstudio (using OpenAI API) -------------------
 # model_lmstudio_gemma4 = ChatOpenAI(
 #     api_key=openai_api_key,
@@ -151,6 +159,13 @@ embeddings_ollama_nomic = OllamaEmbeddings(
     base_url=ollama_base_url,
     #embed_batch_size=32,                # Batch embeddings for efficiency
     #keep_alive="5m",                    # Keep model in memory
+)
+
+# --- Local / Native Llama.cpp Embeddings ----------------------------------
+embeddings_llamacpp_nomic = OpenAIEmbeddings(
+    api_key="llama_cpp", # Dummy key required by LangChain
+    base_url=llamacpp_embed_base,
+    model="nomic-embed-text", 
 )
 
 # --- Local / LMstudio embeddings (using OpenAI API) -----------
