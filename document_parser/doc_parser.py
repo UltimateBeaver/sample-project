@@ -314,7 +314,7 @@ class DocumentParser:
         logger.info("DocumentParser initialized successfully")
     
     @staticmethod
-    def _create_temporal_system_query(observation_date: str) -> str:
+    def _create_temporal_system_query_longer_version(observation_date: str) -> str:
         """
         Create a comprehensive system query for exhaustive atomic facts extraction.
         Uses the AtomicFact schema description as the foundation and adds:
@@ -500,7 +500,67 @@ Return ONLY the list of atomic facts. Each fact should be:
 
 MOST IMPORTANT: Extract EXHAUSTIVELY but CLEANLY. Skip noisy/meta-information and generic descriptions, but capture ALL substantive facts about events, entities, and relationships.
 """
-    
+
+    @staticmethod
+    def _create_temporal_system_query(observation_date: str) -> str:
+        """
+        Create a comprehensive system query for exhaustive atomic facts extraction.
+        Uses the AtomicFact schema description as the foundation and adds:
+        - Emphasis on EXHAUSTIVE extraction (all facts, including supporting details)
+        - Better date conversion examples with explicit mappings
+        - Explicit examples of what NOT to extract (meta-information, noise, irrelevant details)
+        - Clear prohibition on extracting "The observation date is" facts
+        - Instructions to prevent duplicate/near-duplicate facts
+        - Strict guidance on filtering generic descriptions vs. substantive information
+        
+        Note: This query is designed for the LLM at runtime. The AtomicFact schema 
+        description serves a complementary role for JSON structure definition.
+        
+        Args:
+            observation_date: The observation date in format YYYY-MM-DD
+            
+        Returns:
+            System query string with comprehensive temporal context
+        """
+        obs_date = datetime.strptime(observation_date, '%Y-%m-%d')
+        
+        # Calculate example dates for the specific observation date
+        yesterday = (obs_date - timedelta(days=1)).strftime('%Y-%m-%d')
+        three_days_ago = (obs_date - timedelta(days=3)).strftime('%Y-%m-%d')
+        week_monday = (obs_date - timedelta(days=obs_date.weekday())).strftime('%Y-%m-%d')
+        last_week_monday = (obs_date - timedelta(days=obs_date.weekday() + 7)).strftime('%Y-%m-%d')
+        month_first = obs_date.replace(day=1).strftime('%Y-%m-%d')
+        year_first = obs_date.replace(month=1, day=1).strftime('%Y-%m-%d')
+        last_month_first = (obs_date.replace(day=1) - timedelta(days=1)).replace(day=1).strftime('%Y-%m-%d')
+        last_year_first = obs_date.replace(year=obs_date.year - 1, month=1, day=1).strftime('%Y-%m-%d')
+        
+        return f"""
+You are an expert information extraction assistant. Your task is to extract factual, atomic statements from the provided text.
+
+# EXTRACTION GOALS:
+Extract statements about:
+- Main events and actions (e.g., "Company X announced Y")
+- Background context and causal relationships
+- Quantitative data and impacts
+
+# FORMATTING RULES:
+1. ATOMICITY: Each fact must contain exactly ONE piece of information. Break compound sentences apart.
+2. NO PRONOUNS: Replace all pronouns (he, she, it, they) with the specific entity names.
+3. TEMPORAL NORMALIZATION: You MUST replace relative dates with absolute dates based on the observation date ({observation_date}).
+
+REFERENCE EXAMPLES FOR {observation_date}:
+- "today" → on {observation_date}
+- "yesterday" → on {yesterday}
+- "last week" (Monday) → on {last_week_monday}
+- "this year" (Jan 1st) → on {year_first}
+
+# WHAT TO IGNORE:
+Do not extract meta-commentary, introductory phrases (like "While drinking coffee"), or generic corporate marketing speak. Only extract substantive facts.
+
+Return the extracted information strictly adhering to the requested format.
+"""
+
+
     async def extract_atomic_facts_from_paragraphs_batch(
         self,
         paragraphs: List[str],
@@ -571,6 +631,9 @@ MOST IMPORTANT: Extract EXHAUSTIVELY but CLEANLY. Skip noisy/meta-information an
         self, 
         input_excel_path: str, 
         output_excel_path: Optional[str] = None,
+        column_name_date: str = 'date',
+        column_name_paragraph: str = 'lead_paragraph',
+        num_rows_to_process: int = 0, # 0 means process all rows
         batch_size: int = 5,
         apply_post_processing: bool = True
     ) -> pd.DataFrame:
@@ -581,6 +644,8 @@ MOST IMPORTANT: Extract EXHAUSTIVELY but CLEANLY. Skip noisy/meta-information an
         Args:
             input_excel_path: Path to input Excel file with columns: date, lead_paragraph
             output_excel_path: Path to save output Excel file. If None, overwrites input file
+            column_name_date: Name of the column containing dates (default: 'date')
+            column_name_paragraph: Name of the column containing paragraphs (default: 'lead_paragraph')
             batch_size: Number of paragraphs to process in parallel per batch (default: 5)
             apply_post_processing: Whether to apply post-processing (date normalization, deduplication)
             
@@ -588,19 +653,21 @@ MOST IMPORTANT: Extract EXHAUSTIVELY but CLEANLY. Skip noisy/meta-information an
             DataFrame with added factoids_g_truth column
         """
         # Read the Excel file
-        logger.info(f"Reading Excel file: {input_excel_path}")
-        df = pd.read_excel(input_excel_path)
+        if num_rows_to_process > 0:
+            df = pd.read_excel(input_excel_path, nrows=num_rows_to_process)
+            logger.info(f"Loaded first {num_rows_to_process} rows from '{input_excel_path}'")
+        else:
+            df = pd.read_excel(input_excel_path)
+            logger.info(f"Loaded all rows from '{input_excel_path}'")
         
         # Validate required columns
-        if 'date' not in df.columns or 'lead_paragraph' not in df.columns:
-            raise ValueError("Excel file must contain 'date' and 'lead_paragraph' columns")
-        
-        logger.info(f"Loaded {len(df)} rows from Excel file")
+        if column_name_date not in df.columns or column_name_paragraph not in df.columns:
+            raise ValueError(f"Excel file must contain '{column_name_date}' and '{column_name_paragraph}' columns")
         
         # Create the combined column 'lead_paragraph_observation_date'
         logger.info("Creating 'lead_paragraph_observation_date' column...")
         df['lead_paragraph_observation_date'] = df.apply(
-            lambda row: f"Observation date: {row['date']}. {row['lead_paragraph']}",
+            lambda row: f"Observation date: {row[column_name_date]}. {row[column_name_paragraph]}",
             axis=1
         )
         logger.info("✅ Combined column created successfully")
@@ -622,7 +689,7 @@ MOST IMPORTANT: Extract EXHAUSTIVELY but CLEANLY. Skip noisy/meta-information an
         row_indices = []
         
         for idx, row in df.iterrows():
-            date = row['date']
+            date = row[column_name_date]
             paragraph = row['lead_paragraph_observation_date']
             
             # Convert date to string if needed

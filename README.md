@@ -31,7 +31,21 @@ Sample repo for master's degree thesis
     NEO4J_URI=bolt://localhost:7687
     NEO4J_USERNAME=neo4j
     NEO4J_PASSWORD=password
+    # Number of dataset rows to process (for quick testing)
+    # Delete this variable or set it to 0 to process all rows
+    NUM_ROWS_TO_PROCESS=10
+    # Paths for document parsing
+    DOC_PARSER_INPUT_EXCEL_PATH=./data/Annotazioni_1.xlsx
+    DOC_PARSER_OUTPUT_EXCEL_PATH=./data/Annotazioni_1_output.xlsx
+    # Column names in the input Excel file
+    COLUMN_NAME_DATE=DATA
+    COLUMN_NAME_PARAGRAPH=ARTICOLO
     ```
+    Caution: 
+    * Make sure to set DOC_PARSER_INPUT_EXCEL_PATH and DOC_PARSER_OUTPUT_EXCEL_PATH properly
+    * Make sure COLUMN_NAME_DATE and COLUMN_NAME_PARAGRAPH are the same columns name you have in your dataset
+    * Make sure that the dataset is contained on the **FIRST SHEET** of your excel file, otherwise the program will fail.
+
 3. Run/download all the required containers (Neo4j) through the following commands:
     ```bash
     # Start the containers (install image if it does not exists)

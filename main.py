@@ -10,14 +10,7 @@ from sanity_checks.test_config import validate_config
 from itext2kg_atom.itext2kg.atom import Atom
 from itext2kg_atom.itext2kg import Neo4jStorage
 from itext2kg_atom.itext2kg.logging_config import setup_logging
-
-
-# Configure logging to see itext2kg intermediary steps
-# logging.basicConfig(
-#     filename="logs/app.log",
-#     level=logging.INFO
-# )
-# logger = logging.getLogger(__name__)
+from env_config import column_name_date, column_name_paragraph, doc_parser_input_excel_path, doc_parser_output_excel_path, neo4j_uri, neo4j_username, neo4j_password, num_rows_to_process
 
 # Get default llm model and embedding model
 base_llm_model = get_default_model()
@@ -25,13 +18,16 @@ base_embeddings_model = get_default_embedding_model()
 
 # Define a helper function to convert the dataframe's atomic facts into a dictionary,
 # where keys are observation dates and values are the combined list of atomic facts for that date.
-def to_dictionary(df:pd.DataFrame, max_elements: int | None = 20): 
+def to_dictionary(df:pd.DataFrame): 
 
     if isinstance(df['factoids_g_truth'][0], str):
         df["factoids_g_truth"] = df["factoids_g_truth"].apply(lambda x:ast.literal_eval(x))
-    grouped_df = df.groupby("date")["factoids_g_truth"].sum().reset_index()[:max_elements]
+    if num_rows_to_process > 0:
+        grouped_df = df.groupby(column_name_date)["factoids_g_truth"].sum().reset_index()[:num_rows_to_process]
+    else:
+        grouped_df = df.groupby(column_name_date)["factoids_g_truth"].sum().reset_index()
     return {
-        str(date): factoids for date, factoids in grouped_df.set_index("date")["factoids_g_truth"].to_dict().items()
+        str(date): factoids for date, factoids in grouped_df.set_index(column_name_date)["factoids_g_truth"].to_dict().items()
         }
 
 
@@ -42,7 +38,10 @@ async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
     result_df = await parser.parse_excel(
         input_excel_path=doc_parser_input_excel_path,
         output_excel_path=doc_parser_output_excel_path,
-        batch_size=10,  # Process 10 paragraphs in parallel per batch
+        column_name_date=column_name_date,
+        column_name_paragraph=column_name_paragraph,
+        num_rows_to_process=num_rows_to_process,
+        batch_size=2,  # Process 2 paragraphs in parallel per batch
         apply_post_processing=True  # Enable post-processing
     )
     print("\n" + "=" * 70)
@@ -50,8 +49,8 @@ async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
     print("=" * 70)
     
     for idx, row in result_df.iterrows():
-        print(f"\n📅 Date: {row['date']}")
-        print(f"📄 Paragraph: {row['lead_paragraph'][:100]}...")
+        print(f"\n📅 Date: {row[column_name_date]}")
+        print(f"📄 Paragraph: {row[column_name_paragraph][:100]}...")
         print(f"✨ Extracted Atomic Facts ({len(row['factoids_g_truth'])} facts):")
         
         if isinstance(row['factoids_g_truth'], list) and len(row['factoids_g_truth']) > 0:
@@ -78,6 +77,7 @@ async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
 
 async def main():
     
+    # Configure logging to see itext2kg intermediary steps
     # Initialize default logging configuration
     setup_logging(
         log_file="app.log", 
@@ -92,14 +92,14 @@ async def main():
         return
     
 
-    #df_atomic_facts = await parse_news_paragraphs_into_atomic_facts()
-    #df_atomic_facts.to_pickle(doc_parser_output_excel_path.replace(".xlsx", ".pkl"))
+    df_atomic_facts = await parse_news_paragraphs_into_atomic_facts()
+    df_atomic_facts.to_pickle(doc_parser_output_excel_path.replace(".xlsx", ".pkl"))
 
     # Load the 2020-COVID-NYT dataset pickle (only 10 rows for testing)
     #news_covid = pd.read_pickle("./itext2kg-1.0.0/datasets/atom/nyt_news/2020_nyt_COVID_last_version_ready.pkl")
-    news_covid = pd.read_pickle("./data/small_pickle.pkl")
+    #news_covid = pd.read_pickle("./data/small_pickle.pkl")
 
-    #news_covid = pd.read_pickle(doc_parser_output_excel_path.replace(".xlsx", ".pkl"))
+    news_covid = pd.read_pickle(doc_parser_output_excel_path.replace(".xlsx", ".pkl"))
 
     """
     Todo: When reading small_pickle.pkl everything works fine.

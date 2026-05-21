@@ -9,5 +9,5 @@ foreach ($line in $envFile) {
 }
 
 # Now use the environment variables
-Start-Process powershell.exe -ArgumentList "-NoExit -Command llama-server -m `"$env:LLAMACPP_PATH_MODEL`" -c 32768 -ngl 99 -fa on --port 8080 -np 2"
+Start-Process powershell.exe -ArgumentList "-NoExit -Command llama-server -m `"$env:LLAMACPP_PATH_MODEL`" -c 32768 -ngl 99 -fa on --port 8080 -np 1"
 Start-Process powershell.exe -ArgumentList "-NoExit -Command llama-server -m `"$env:LLAMACPP_PATH_EMBEDDINGS_MODEL`" -c 2048 -ngl 99 --port 8081 --embedding"

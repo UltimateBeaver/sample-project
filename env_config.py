@@ -16,5 +16,8 @@ neo4j_username = os.getenv("NEO4J_USERNAME")
 neo4j_password = os.getenv("NEO4J_PASSWORD")
 
 # Static constants
-doc_parser_input_excel_path = "./data/sample_news.xlsx"
-doc_parser_output_excel_path = "./data/sample_news_with_factoids.xlsx"
+num_rows_to_process = abs(int(os.getenv("NUM_ROWS_TO_PROCESS", 0)))  # 0 means process all rows
+doc_parser_input_excel_path = os.getenv("DOC_PARSER_INPUT_EXCEL_PATH")
+doc_parser_output_excel_path = os.getenv("DOC_PARSER_OUTPUT_EXCEL_PATH")
+column_name_date = os.getenv("COLUMN_NAME_DATE", "date")
+column_name_paragraph = os.getenv("COLUMN_NAME_PARAGRAPH", "lead_paragraph")
