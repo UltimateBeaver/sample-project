@@ -18,9 +18,13 @@ Sample repo for master's degree thesis
     ```
 2. Create a `.env` file on the root directory of the project. Insert your own API keys
     ```bash
+    # Hugging Face Token (enables higher rate limits and faster downloads. Sign in to Hugging Face and create a token at https://huggingface.co/settings/tokens)
+    HF_TOKEN=your-hugging-face-token
     # OpenaiAPI (llama.cpp)
     OPENAI_API_BASE=http://localhost:8080/v1
     LLAMACPP_EMBED_BASE=http://localhost:8081/v1
+    LLAMACPP_PATH_MODEL="path/to/your/model.gguf"
+    LLAMACPP_PATH_EMBEDDINGS_MODEL="path/to/your/embedding_model.gguf"
     OPENAI_API_KEY=llama_cpp
     # TogetherAPI (Currently not used)
     TOGETHER_API_BASE=https://api.together.xyz/v1
@@ -36,12 +40,15 @@ Sample repo for master's degree thesis
     NUM_ROWS_TO_PROCESS=10
     # Paths for document parsing
     DOC_PARSER_INPUT_EXCEL_PATH=./data/Annotazioni_1.xlsx
-    DOC_PARSER_OUTPUT_EXCEL_PATH=./data/Annotazioni_1_output.xlsx
+    DOC_PARSER_OUTPUT_EXCEL_PATH=./data/Annotazioni_1_with_factoids.xlsx
+    DOC_PARSER_ENABLE_PARALLEL_PROCESSING=false
+    # Batch size for document parsing (number of paragraphs to process in parallel)
+    DOC_PARSER_BATCH_SIZE=2
     # Column names in the input Excel file
     COLUMN_NAME_DATE=DATA
     COLUMN_NAME_PARAGRAPH=ARTICOLO
     ```
-    Caution: 
+    **Caution:**
     * Make sure to set DOC_PARSER_INPUT_EXCEL_PATH and DOC_PARSER_OUTPUT_EXCEL_PATH properly
     * Make sure COLUMN_NAME_DATE and COLUMN_NAME_PARAGRAPH are the same columns name you have in your dataset
     * Make sure that the dataset is contained on the **FIRST SHEET** of your excel file, otherwise the program will fail.
@@ -68,11 +75,12 @@ Sample repo for master's degree thesis
     Note: you can download other ollama models from here: https://ollama.com/search
     <br>Ollama will use ChatOllama Langchain API.
 
-* If you want to use llama.cpp, you have to download the right docker image (or directly the llama.cpp binaries) that matches your OS and GPU. A bare metal setup  is provided below (tested with Windows 11 with AMD Radeon GPU):
+* If you want to use llama.cpp, you have to download the right docker image (or directly the llama.cpp binaries) that match your OS and GPU. A bare metal setup  is provided below (tested with Windows 11 with AMD Radeon GPU):
     1. Go to the official llama.cpp https://github.com/ggml-org/llama.cpp/releases and look for the newest release. Download the one that matches your hardware (in my case a Windows zip file compiled for ROCm/HIP)
     2. Using powershell, download your chosen model in GGUF format (e.g., a quantized version of Gemma 4) from Hugging Face through the following command:
         ```powershell
-        curl -L -o real_model.gguf "https://lmstudio.ai/models/google/gemma-4-e4b"
+        curl -L -o llm_model.gguf "https://lmstudio.ai/models/google/gemma-4-e4b"
+        curl -L -o embedding_model.gguf "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF"
         ```
         **Then add the paths of these models into the two variables `LLAMACPP_PATH_MODEL` and `LLAMACPP_PATH_EMBEDDINGS_MODEL`, inside `.env` file**
     3. Extract the llama.cpp binaries in a folder you like. Add the path to this folder in your environment variables (on Windows add it to PATH, in control panel)

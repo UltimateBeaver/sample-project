@@ -314,7 +314,7 @@ class DocumentParser:
         logger.info("DocumentParser initialized successfully")
     
     @staticmethod
-    def _create_temporal_system_query_longer_version(observation_date: str) -> str:
+    def _create_temporal_system_query_ollama_version(observation_date: str) -> str:
         """
         Create a comprehensive system query for exhaustive atomic facts extraction.
         Uses the AtomicFact schema description as the foundation and adds:
@@ -634,7 +634,8 @@ Return the extracted information strictly adhering to the requested format.
         column_name_date: str = 'date',
         column_name_paragraph: str = 'lead_paragraph',
         num_rows_to_process: int = 0, # 0 means process all rows
-        batch_size: int = 5,
+        doc_parser_enable_parallel_processing: bool = True,
+        batch_size: int = 2,
         apply_post_processing: bool = True
     ) -> pd.DataFrame:
         """
@@ -646,7 +647,7 @@ Return the extracted information strictly adhering to the requested format.
             output_excel_path: Path to save output Excel file. If None, overwrites input file
             column_name_date: Name of the column containing dates (default: 'date')
             column_name_paragraph: Name of the column containing paragraphs (default: 'lead_paragraph')
-            batch_size: Number of paragraphs to process in parallel per batch (default: 5)
+            batch_size: Number of paragraphs to process in parallel per batch (default: 2)
             apply_post_processing: Whether to apply post-processing (date normalization, deduplication)
             
         Returns:
@@ -731,9 +732,17 @@ Return the extracted information strictly adhering to the requested format.
             )
             batch_tasks.append(task)
         
-        # Execute all batch tasks in parallel
-        logger.info("Starting parallel batch processing...")
-        batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        batch_results = []
+        if doc_parser_enable_parallel_processing:
+            # Execute all batch tasks in parallel
+            logger.info("Starting parallel batch processing...")
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        else:
+            # Execute batches sequentially to respect local server queues
+            logger.info("Starting sequential batch processing...")
+            for task in batch_tasks:
+                result = await task
+                batch_results.append(result)
         
         # Collect results
         for batch_result in batch_results:

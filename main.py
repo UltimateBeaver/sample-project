@@ -10,7 +10,7 @@ from sanity_checks.test_config import validate_config
 from itext2kg_atom.itext2kg.atom import Atom
 from itext2kg_atom.itext2kg import Neo4jStorage
 from itext2kg_atom.itext2kg.logging_config import setup_logging
-from env_config import column_name_date, column_name_paragraph, doc_parser_input_excel_path, doc_parser_output_excel_path, neo4j_uri, neo4j_username, neo4j_password, num_rows_to_process
+from env_config import *
 
 # Get default llm model and embedding model
 base_llm_model = get_default_model()
@@ -41,7 +41,8 @@ async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
         column_name_date=column_name_date,
         column_name_paragraph=column_name_paragraph,
         num_rows_to_process=num_rows_to_process,
-        batch_size=2,  # Process 2 paragraphs in parallel per batch
+        doc_parser_enable_parallel_processing=doc_parser_enable_parallel_processing,
+        batch_size=doc_parser_batch_size,  # Process N paragraphs in parallel per batch
         apply_post_processing=True  # Enable post-processing
     )
     print("\n" + "=" * 70)
