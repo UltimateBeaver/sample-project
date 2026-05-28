@@ -210,6 +210,8 @@ __marimo__/
 # Additional gitignore settings
 /ignore
 /docker
+/neo4j
+neo4j.sif
 
 # Microsoft Word
 *.docx.tmp

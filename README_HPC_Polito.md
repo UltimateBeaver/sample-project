@@ -173,10 +173,20 @@ In this guide there will be several steps in which you are required to copy-past
     module load gcc/12.4.0
     module load nvhpc/25.1
 
+    # Move old logs (except the current ones) into a subfolder
+    cd $HOME/thesis-project/sample-project/logs
+    mkdir old
+    find . -maxdepth 1 -type f ! -name "*$(squeue -u $(whoami) -h -o '%A')*" -exec mv -t ./old {} +
+    # mv *.log ./old
+
     # Copy the whole project in $SCRATCH_FLASH filesystem
-    echo "Copying required files from $HOME to $SCRATCH_FLASH..."
-    mkdir -p $SCRATCH_FLASH/thesis-project
-    cp -r $HOME/thesis-project/sample-project $SCRATCH_FLASH/thesis-project
+    # echo "Copying required files from $HOME to $SCRATCH_FLASH..."
+    # mkdir -p $SCRATCH_FLASH/thesis-project
+    # cp -r $HOME/thesis-project/sample-project $SCRATCH_FLASH/thesis-project
+    echo "Syncing required project files from $HOME to $SCRATCH_FLASH..."
+    rsync -av --exclude='.git' --exclude='logs' \
+    $HOME/thesis-project/sample-project/ \
+    $SCRATCH_FLASH/thesis-project/sample-project/
 
     # Move into the directory where your project files, scripts, and .env exist
     cd $SCRATCH_FLASH/thesis-project/sample-project
@@ -192,8 +202,10 @@ In this guide there will be several steps in which you are required to copy-past
     # 2. Launch Background Infrastructure Services
     # =========================================================================
     echo "Launching Neo4j container via Apptainer..."
-    mkdir -p $HOME/neo4j/data $HOME/neo4j/logs
-    apptainer run --writable-tmpfs --bind $HOME/neo4j/data:/data --bind $HOME/neo4j/logs:/logs ./neo4j.sif &
+    # Set the database username/password matching your .env configurations
+    export APPTAINERENV_NEO4J_AUTH="neo4j/password"
+    mkdir -p $HOME/thesis-project/sample-project/neo4j/data $HOME/thesis-project/sample-project/neo4j/logs
+    apptainer run --writable-tmpfs --bind $HOME/thesis-project/sample-project/neo4j/data:/data --bind $HOME/thesis-project/sample-project/neo4j/logs:/logs ./neo4j.sif &
     NEO4J_PID=$!
 
     echo "Launching llama.cpp Model and Embedding Servers..."
@@ -222,7 +234,7 @@ In this guide there will be several steps in which you are required to copy-past
     pkill llama-server
 
     # Copy modified files on $SCRATCH_FLASH back to $HOME
-    rsync -av --exclude '.git' $SCRATCH/thesis-project/sample-project/ $HOME/thesis-project/sample-project/
+    rsync -av --exclude '.git' $SCRATCH_FLASH/thesis-project/sample-project/ $HOME/thesis-project/sample-project/
 
     echo "Job completed successfully!"
     ```
@@ -230,15 +242,6 @@ In this guide there will be several steps in which you are required to copy-past
     * *thesis_job_stdout_[JOBID].log*: Displays the standard printed pipeline metrics and updates.
     * *model.log*: Shows how the LLM model is loading into the GPU.
     * *embedding.log*: Shows how the embedding model is running.
-
-# Run the application
-```bash
-# Move to the python virtual environment (if not already there)
-source venv/bin/activate
-# Make sure Docker and Ollama/llama_cpp_servers are running!
-# Finally execute the app
-python main.py
-```
 
 ---
 # Developer tips
@@ -257,7 +260,6 @@ ProviderType.OLLAMA: ProviderConfig(
 The following is the default config for llama.cpp:
 ```python
 ProviderType.OPENAI: ProviderConfig(
-    built-in rate limiting handle the rest
     name="llama.cpp (Local)",
     max_elements_per_batch=8,    
     max_tokens_per_batch=8192,   # Very conservative token limit

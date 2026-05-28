@@ -124,7 +124,6 @@ ProviderType.OLLAMA: ProviderConfig(
 The following is the default config for llama.cpp:
 ```python
 ProviderType.OPENAI: ProviderConfig(
-    built-in rate limiting handle the rest
     name="llama.cpp (Local)",
     max_elements_per_batch=8,    
     max_tokens_per_batch=8192,   # Very conservative token limit
