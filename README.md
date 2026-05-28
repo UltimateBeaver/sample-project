@@ -47,6 +47,9 @@ Sample repo for master's degree thesis
     # Column names in the input Excel file
     COLUMN_NAME_DATE=DATA
     COLUMN_NAME_PARAGRAPH=ARTICOLO
+    # Polito HPC ssh settings
+    HPC_USER=your-ssh-username
+    HPC_HOST=hpc-legionlogin.polito.it
     ```
     **Caution:**
     * Make sure to set DOC_PARSER_INPUT_EXCEL_PATH and DOC_PARSER_OUTPUT_EXCEL_PATH properly

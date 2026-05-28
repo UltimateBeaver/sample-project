@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=4             # Request 4 CPU cores for data processing
 #SBATCH --mem=32GB                    # Request 32 GB system memory
 #SBATCH --gres=gpu:1                  # Request 1 GPU (Required for Gemma 4)
-#SBATCH --time=0-08:00:00             # Max runtime (Hours: 8 hours)
+#SBATCH --time=0-02:00:00             # Max runtime (Hours: 2 hours)
 #SBATCH --partition=gpu_a40           # GPU partition on the cluster
 #SBATCH --output=logs/thesis_job_stdout_%j.log    # Standard output log file
 #SBATCH --error=logs/thesis_job_stderr_%j.log     # Standard error log file
@@ -20,7 +20,7 @@ module load nvhpc/25.1
 
 # Move old logs (except the current ones) into a subfolder
 cd $HOME/thesis-project/sample-project/logs
-mkdir old
+mkdir -p old
 find . -maxdepth 1 -type f ! -name "*$(squeue -u $(whoami) -h -o '%A')*" -exec mv -t ./old {} +
 # mv *.log ./old
 

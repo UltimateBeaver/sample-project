@@ -63,6 +63,9 @@ In this guide there will be several steps in which you are required to copy-past
     # Column names in the input Excel file
     COLUMN_NAME_DATE=DATA
     COLUMN_NAME_PARAGRAPH=ARTICOLO
+    # Polito HPC ssh settings
+    HPC_USER=your-ssh-username
+    HPC_HOST=hpc-legionlogin.polito.it
     ```
     **Caution:**
     * Make sure to set DOC_PARSER_INPUT_EXCEL_PATH and DOC_PARSER_OUTPUT_EXCEL_PATH properly
@@ -78,17 +81,21 @@ In this guide there will be several steps in which you are required to copy-past
 * If you use Ollama, as default settings in models/models.py, download the required models:
     ```bash
     # Install Ollama
-    curl -L https://ollama.com/download/ollama-linux-amd64 -o ~/thesis-project/ollama
-    chmod +x ~/thesis-project/ollama
+    curl -L https://ollama.com/download/ollama-linux-amd64.tar.zst -o ~/thesis-project/ollama.tar.zst
+    mkdir -p ~/thesis-project/ollama
+    tar x -f ~/thesis-project/ollama.tar.zst -C ~/thesis-project/ollama
 
     # Request an interactive session via SLURM
     srun --nodes=1 --tasks-per-node=1 --cpus-per-task=1 --time=01:00:00 --partition=cpu_sapphire --pty /bin/bash
-    cd ~/thesis-project/ollama
+    cd ~/thesis-project/ollama/bin
+    # Start the server in the background so you can pull models
+    ./ollama serve &
     # Default llm model
-    ollama pull gemma4:e4b
+    ./ollama pull gemma4:e4b
     # Default embedding model
-    ollama pull nomic-embed-text:latest
+    ./ollama pull nomic-embed-text:latest
 
+    pkill "./ollama serve"
     # Close SLURM session
     squeue -u $(whoami) -h -o "%A" | xargs -I {} scancel {}
     ```
@@ -151,97 +158,40 @@ In this guide there will be several steps in which you are required to copy-past
         Note: llama.cpp will use ChatOpenAI Langchain API.
         <br>Make sure that the port you are opening the server is the same as the one configured in `OPENAI_API_BASE` of your `.env` file
 
-5. Create a SLURM script and name it *submit.sh*. Add execution permissions with `chmod +x submit.sh`. Then copy and paste the following content into *submit.sh*:
-    ```bash
-    #!/usr/bin/env bash
-    #SBATCH --job-name=thesis_pipeline
-    #SBATCH --nodes=1                     # Request 1 compute node
-    #SBATCH --ntasks=1                    # 1 main task execution
-    #SBATCH --cpus-per-task=4             # Request 4 CPU cores for data processing
-    #SBATCH --mem=32GB                    # Request 32 GB system memory
-    #SBATCH --gres=gpu:1                  # Request 1 GPU (Required for Gemma 4)
-    #SBATCH --time=0-02:00:00             # Max runtime (Hours: 2 hours)
-    #SBATCH --partition=gpu_a40           # GPU partition on the cluster
-    #SBATCH --output=logs/thesis_job_stdout_%j.log    # Standard output log file
-    #SBATCH --error=logs/thesis_job_stderr_%j.log     # Standard error log file
+5. Inspect the SLURM script *submit.sh* and edit the #SBATCH directives to your needs. Add execution permissions with `chmod +x submit.sh`.
 
-    # =========================================================================
-    # 1. Environment & Path Initialization
-    # =========================================================================
-    module purge
-    module load miniconda3/3.13.25
-    module load gcc/12.4.0
-    module load nvhpc/25.1
+6. Run `sbatch submit.sh`. Some utilities commands are provided below:
+    | Command    | Description |
+    | -------- | ------- |
+    | `squeue -u $(whoami)`  | To monitor your active queue status    |
+    | `sacct -j <job id> --format=JobID,Start,End,Elapsed,NCPUS` | To view the statistics of a completed job     |
+    | `scontrol show jobid=<job id>`    | Shows detailed information about a running/pending job    |
+    | `scancel <jobid>`    | To cancel a job    |
+    | `scancel -A $(whoami)`    | To cancel all jobs for your current account    |
 
-    # Move old logs (except the current ones) into a subfolder
-    cd $HOME/thesis-project/sample-project/logs
-    mkdir old
-    find . -maxdepth 1 -type f ! -name "*$(squeue -u $(whoami) -h -o '%A')*" -exec mv -t ./old {} +
-    # mv *.log ./old
-
-    # Copy the whole project in $SCRATCH_FLASH filesystem
-    # echo "Copying required files from $HOME to $SCRATCH_FLASH..."
-    # mkdir -p $SCRATCH_FLASH/thesis-project
-    # cp -r $HOME/thesis-project/sample-project $SCRATCH_FLASH/thesis-project
-    echo "Syncing required project files from $HOME to $SCRATCH_FLASH..."
-    rsync -av --exclude='.git' --exclude='logs' \
-    $HOME/thesis-project/sample-project/ \
-    $SCRATCH_FLASH/thesis-project/sample-project/
-
-    # Move into the directory where your project files, scripts, and .env exist
-    cd $SCRATCH_FLASH/thesis-project/sample-project
-
-    # Activate your local Python Virtual Environment
-    source venv/bin/activate
-
-    # CRITICAL: Add your freshly compiled llama.cpp folder to the system PATH 
-    # so 'start-llama-servers.sh' can find and execute the 'llama-server' binary
-    export PATH=$SCRATCH_FLASH/thesis-project/llama.cpp/build/bin:$PATH
-
-    # =========================================================================
-    # 2. Launch Background Infrastructure Services
-    # =========================================================================
-    echo "Launching Neo4j container via Apptainer..."
-    # Set the database username/password matching your .env configurations
-    export APPTAINERENV_NEO4J_AUTH="neo4j/password"
-    mkdir -p $HOME/thesis-project/sample-project/neo4j/data $HOME/thesis-project/sample-project/neo4j/logs
-    apptainer run --writable-tmpfs --bind $HOME/thesis-project/sample-project/neo4j/data:/data --bind $HOME/thesis-project/sample-project/neo4j/logs:/logs ./neo4j.sif &
-    NEO4J_PID=$!
-
-    echo "Launching llama.cpp Model and Embedding Servers..."
-    chmod +x start-llama-servers.sh
-    ./start-llama-servers.sh
-
-    # Give the background engines enough time to load the GGUF models into VRAM
-    echo "Waiting 30 seconds for infrastructure to boot completely..."
-    sleep 30
-
-    # =========================================================================
-    # 3. Run Core Python Application Pipeline
-    # =========================================================================
-    echo "Starting main application pipeline execution (main.py)..."
-    python main.py
-
-    # =========================================================================
-    # 4. Graceful Cleanup of Background Services
-    # =========================================================================
-    echo "Terminating all background cluster services gracefully..."
-
-    # Stop the Apptainer database container
-    kill $NEO4J_PID
-
-    # Stop both detached llama-server instances (ports 8080 and 8081)
-    pkill llama-server
-
-    # Copy modified files on $SCRATCH_FLASH back to $HOME
-    rsync -av --exclude '.git' $SCRATCH_FLASH/thesis-project/sample-project/ $HOME/thesis-project/sample-project/
-
-    echo "Job completed successfully!"
-    ```
-6. Run `sbatch submit.sh`. You can monitor your active queue status using `squeue -u $(whoami)`. To view the statistics of a completed job use `sacct -j <job id> --format=JobID,Start,End,Elapsed,NCPUS`. For detailed information about a running/pending job, use `scontrol show jobid=<job id>`. To cancel a job use `scancel <jobid>`. To cancel all jobs for your current account use `scancel -A $(whoami)`
     * *thesis_job_stdout_[JOBID].log*: Displays the standard printed pipeline metrics and updates.
     * *model.log*: Shows how the LLM model is loading into the GPU.
     * *embedding.log*: Shows how the embedding model is running.
+
+7. Export the generated Knowledge Graphs using these commands:
+    ```bash
+    apptainer exec \
+    --bind ~/thesis-project/sample-project/neo4j/data:/data \
+    docker://neo4j:latest \
+    neo4j-admin database dump neo4j --to-path=/data --overwrite-destination=true
+    ```
+
+8. Make sure you have properly set $HPC_USER and $HPC_HOST on `.env` file. Then move to a terminal on your host machine and double-check the following sections of `pull-from-HPC`. 
+    ```bash
+    $LOCAL_PROJECT_ROOT = "." # Relative path to local repo on your host
+
+    # [...]
+    # Local container identifier
+    $DOCKER_CONTAINER_NAME = "neo4j"    # The exact name of neo4j docker container on your host
+    ```
+    Execute `pull-from-HPC.ps1` or `pull-from-HPC.sh` script, depending on your OS, to download Knowledge Graph dump database and application logs.
+
+
 
 ---
 # Developer tips
