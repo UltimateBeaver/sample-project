@@ -54,7 +54,8 @@ from difflib import SequenceMatcher
 from itext2kg_atom.itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg_atom.itext2kg.atom.models import AtomicFact
 
-
+# Set up logger for this module
+logger = get_logger(__name__)
 
 # ============================================================================
 # HELPER FUNCTIONS FOR DATE NORMALIZATION AND DUPLICATE REMOVAL
@@ -302,9 +303,6 @@ class DocumentParser:
             llm_model: The language model instance (ChatOllama, ChatOpenAI, etc.)
             embeddings_model: Optional embeddings model for semantic operations
         """
-        global logger
-        logger = get_logger(__name__)
-        
         self.llm_model = llm_model
         self.embeddings_model = embeddings_model
         self.parser = LangchainOutputParser(

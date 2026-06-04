@@ -78,12 +78,17 @@ async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
 
 async def main():
     
-    # Configure logging to see itext2kg intermediary steps
-    # Initialize default logging configuration
+    # Configure logging with performance optimizations
+    # Note: When level="DEBUG", langchain loggers are now set to WARNING by default
+    # to avoid excessive debug output from external libraries (which was causing 2x slowdown)
+    # You can override this with: langchain_level="DEBUG" to see full debug output from langchain
+    
+    # Initialize logging configuration
     setup_logging(
         log_file="app.log", 
-        level="DEBUG",
-        console_output=True
+        level="DEBUG",  # Your itext2kg logs at DEBUG level
+        console_output=True,
+        langchain_level="WARNING"  # Keep external library logs at WARNING for performance
     )
     logger = logging.getLogger("itext2kg")
 

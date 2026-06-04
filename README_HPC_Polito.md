@@ -41,6 +41,14 @@ In this guide there will be several steps in which you are required to copy-past
     LLAMACPP_PATH_EMBEDDINGS_MODEL="$HOME/thesis-project/models/embedding_model.gguf"
     # Path to the compiled llama-server executable binary
     LLAMACPP_SERVER_BIN="$HOME/thesis-project/llama.cpp/build/bin/llama-server"
+    # number of parallel sequences to decode (default: 1)
+    LLAMACPP_MODEL_NUM_PARALLEL_SLOTS=1
+    # Represents the total global pool shared across all parallel slots
+    LLAMACPP_MODEL_CONTEXT_SIZE=32768
+    LLAMACPP_EMBED_CONTEXT_SIZE=2048
+    # Max. number of layers to store in VRAM, either an exact number, 'auto', or 'all' (default: auto)
+    LLAMACPP_MODEL_NGL=99
+    LLAMACPP_EMBED_NGL=99
     OPENAI_API_KEY=llama_cpp
     # TogetherAPI (Currently not used)
     TOGETHER_API_BASE=https://api.together.xyz/v1
@@ -197,30 +205,42 @@ In this guide there will be several steps in which you are required to copy-past
 # Developer tips
 - When adding a new package, add the definition also in pyproject.toml
 - When changing models, please refer to [langchain_output_parser.py](./itext2kg_atom/itext2kg/llm_output_parsing/langchain_output_parser.py), updating PROVIDER_CONFIGS object. This is the default config for Ollama:
-```python
-ProviderType.OLLAMA: ProviderConfig(
-    name="Ollama",
-    max_elements_per_batch=32,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
-    max_tokens_per_batch=12000,   # Increased to 12K per request (local inference, not API limits)
-    max_context_window=32768,   # Ollama context window
-    max_pending_requests=None,   # Ollama doesn't have explicit pending request limits
-    sleep_between_batches=0.1,   # 100ms between batches to prevent GPU thrashing
-)
-```
+    ```python
+    ProviderType.OLLAMA: ProviderConfig(
+        name="Ollama",
+        max_elements_per_batch=32,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
+        max_tokens_per_batch=12000,   # Increased to 12K per request (local inference, not API limits)
+        max_context_window=32768,   # Ollama context window
+        max_pending_requests=None,   # Ollama doesn't have explicit pending request limits
+        sleep_between_batches=0.1,   # 100ms between batches to prevent GPU thrashing
+    )
+    ```
 The following is the default config for llama.cpp:
-```python
-ProviderType.OPENAI: ProviderConfig(
-    name="llama.cpp (Local)",
-    max_elements_per_batch=8,    
-    max_tokens_per_batch=8192,   # Very conservative token limit
-    max_context_window=16384,    # Typical for local models
-    max_pending_requests=None,
-    #sleep_between_batches=0.1,   # Small delay between requests
-),
-```
+    ```python
+    ProviderType.OPENAI: ProviderConfig(
+        name="llama.cpp (Local)",
+        max_elements_per_batch=8,    
+        max_tokens_per_batch=8192,   # Very conservative token limit
+        max_context_window=16384,    # Typical for local models
+        max_pending_requests=None,
+        #sleep_between_batches=0.1,   # Small delay between requests
+    ),
+    ```
 
 - If you encounter crashes or instability issues of llama.cpp model server, change the num-parallel parameter to `-np 1`. 
 <br>Processing multiple reasoning streams at the same time on a single local GPU heavily degrades individual latency. Running them sequentially is actually more practical because a single request gets 100% of your GPU's compute. -np 1 tells the engine to completely disable multi-slot context blending.
+
+- to check if Cuda is supported, run the following commands:
+    ```python
+    srun --nodes=1 --tasks-per-node=1 --cpus-per-task=4 --gres=gpu:1 --time=01:30:00 --partition=gpu_a40 --pty /bin/bash
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+    python
+    import torch
+    print(torch.cuda.is_available())  # Should return True!
+    print(torch.cuda.get_device_name(0))  # Should print "NVIDIA A40"
+    quit()
+    squeue -u $(whoami) -h -o "%A" | xargs -I {} scancel {}
+    ```
 
 # Bugfix Checklist
 - [x] Self loop relationships without any sense

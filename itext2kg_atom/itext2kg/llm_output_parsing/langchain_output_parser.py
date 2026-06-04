@@ -6,11 +6,12 @@ from typing import Union, List, Any, Optional
 import numpy as np
 import tiktoken
 from .llm_output_parser_interface import LLMOutputParserInterface
+from itext2kg.logging_config import get_logger
 from dataclasses import dataclass
 from enum import Enum
 
 # Set up logger for this module
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class ProviderType(Enum):
     """Supported LLM providers"""

@@ -25,6 +25,14 @@ Sample repo for master's degree thesis
     LLAMACPP_EMBED_BASE=http://localhost:8081/v1
     LLAMACPP_PATH_MODEL="path/to/your/model.gguf"
     LLAMACPP_PATH_EMBEDDINGS_MODEL="path/to/your/embedding_model.gguf"
+    # number of parallel sequences to decode (default: 1)
+    LLAMACPP_MODEL_NUM_PARALLEL_SLOTS=1
+    # Represents the total global pool shared across all parallel slots
+    LLAMACPP_MODEL_CONTEXT_SIZE=32768
+    LLAMACPP_EMBED_CONTEXT_SIZE=2048
+    # Max. number of layers to store in VRAM, either an exact number, 'auto', or 'all' (default: auto)
+    LLAMACPP_MODEL_NGL=99
+    LLAMACPP_EMBED_NGL=99
     OPENAI_API_KEY=llama_cpp
     # TogetherAPI (Currently not used)
     TOGETHER_API_BASE=https://api.together.xyz/v1
@@ -138,6 +146,16 @@ ProviderType.OPENAI: ProviderConfig(
 
 - If you encounter crashes or instability issues of llama.cpp model server, change the num-parallel parameter to `-np 1`. 
 <br>Processing multiple reasoning streams at the same time on a single local GPU heavily degrades individual latency. Running them sequentially is actually more practical because a single request gets 100% of your GPU's compute. -np 1 tells the engine to completely disable multi-slot context blending.
+
+- to check if Cuda (AMD ROCm supported wheel) is supported, run the following commands:
+    ```python
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6
+    python
+    import torch
+    print(torch.cuda.is_available())  # Should return True!
+    print(torch.cuda.get_device_name(0))  # Should print "AMD Radeon ..."
+    quit()
+    ```
 
 # Bugfix Checklist
 - [x] Self loop relationships without any sense
