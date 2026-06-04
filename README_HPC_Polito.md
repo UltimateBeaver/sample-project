@@ -35,8 +35,10 @@ In this guide there will be several steps in which you are required to copy-past
     # Hugging Face Token (enables higher rate limits and faster downloads. Sign in to Hugging Face and create a token at https://huggingface.co/settings/tokens)
     HF_TOKEN=your-hugging-face-token
     # OpenaiAPI (llama.cpp)
-    OPENAI_API_BASE=http://localhost:8080/v1
-    LLAMACPP_EMBED_BASE=http://localhost:8081/v1
+    LLAMA_CPP_MODEL_PORT=8080
+    LLAMA_CPP_EMBED_PORT=8081
+    OPENAI_API_BASE="http://localhost:${LLAMA_CPP_MODEL_PORT}/v1"
+    LLAMACPP_EMBED_BASE="http://localhost:${LLAMA_CPP_EMBED_PORT}/v1"
     LLAMACPP_PATH_MODEL="$HOME/thesis-project/models/llm_model.gguf"
     LLAMACPP_PATH_EMBEDDINGS_MODEL="$HOME/thesis-project/models/embedding_model.gguf"
     # Path to the compiled llama-server executable binary
