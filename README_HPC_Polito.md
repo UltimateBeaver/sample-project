@@ -183,15 +183,7 @@ In this guide there will be several steps in which you are required to copy-past
     * *model.log*: Shows how the LLM model is loading into the GPU.
     * *embedding.log*: Shows how the embedding model is running.
 
-7. Export the generated Knowledge Graphs using these commands:
-    ```bash
-    apptainer exec \
-    --bind ~/thesis-project/sample-project/neo4j/data:/data \
-    docker://neo4j:latest \
-    neo4j-admin database dump neo4j --to-path=/data --overwrite-destination=true
-    ```
-
-8. Make sure you have properly set $HPC_USER and $HPC_HOST on `.env` file. Then move to a terminal on your host machine and double-check the following sections of `pull-from-HPC`. 
+7. Make sure you have properly set $HPC_USER and $HPC_HOST on `.env` file. Then move to a terminal on your host machine and double-check the following sections of `pull-from-HPC`. 
     ```bash
     $LOCAL_PROJECT_ROOT = "." # Relative path to local repo on your host
 

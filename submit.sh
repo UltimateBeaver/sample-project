@@ -49,8 +49,8 @@ export PATH=$SCRATCH_FLASH/thesis-project/llama.cpp/build/bin:$PATH
 echo "Launching Neo4j container via Apptainer..."
 # Set the database username/password matching your .env configurations
 export APPTAINERENV_NEO4J_AUTH="neo4j/password"
-mkdir -p $HOME/thesis-project/sample-project/neo4j/data $HOME/thesis-project/sample-project/neo4j/logs
-apptainer run --writable-tmpfs --bind $HOME/thesis-project/sample-project/neo4j/data:/data --bind $HOME/thesis-project/sample-project/neo4j/logs:/logs ./neo4j.sif &
+mkdir -p $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs
+apptainer run --writable-tmpfs --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs ./neo4j.sif &
 NEO4J_PID=$!
 
 echo "Launching llama.cpp Model and Embedding Servers..."
@@ -75,8 +75,18 @@ echo "Terminating all background cluster services gracefully..."
 # Stop the Apptainer database container
 kill $NEO4J_PID
 
+# Give the Neo4j engine enough time to safely flush transactions and release file locks
+echo "Waiting 15 seconds for Neo4j files to completely close..."
+sleep 15
+
 # Stop both detached llama-server instances (ports 8080 and 8081)
 pkill llama-server
+
+# Export the generated Knowledge Graphs using neo4j-admin image
+apptainer exec \
+    --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data \
+    docker://neo4j:latest \
+    neo4j-admin database dump neo4j --to-path=/data --overwrite-destination=true
 
 # Copy modified files on $SCRATCH_FLASH back to $HOME
 rsync -av --exclude '.git' $SCRATCH_FLASH/thesis-project/sample-project/ $HOME/thesis-project/sample-project/
