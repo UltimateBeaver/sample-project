@@ -18,6 +18,11 @@ module load miniconda3/3.13.25
 module load gcc/12.4.0
 module load nvhpc/25.1
 
+# Use the cluster's NVHPC path to inject CUDA runtime and math libraries
+if [ -n "$NVHPC_ROOT" ]; then
+    export LD_LIBRARY_PATH="$NVHPC_ROOT/cuda/lib64:$NVHPC_ROOT/math_libs/lib64:$LD_LIBRARY_PATH"
+fi
+
 # Move old logs (except the current ones) into a subfolder
 cd $HOME/thesis-project/sample-project/logs
 mkdir -p old
