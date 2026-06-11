@@ -2,7 +2,7 @@
 Sample repo for master's degree thesis
 
 # Requirements
-* Python (3.9 or greater) at https://www.python.org/downloads/
+* Python (3.10 or greater) at https://www.python.org/downloads/
 * Docker at https://www.docker.com/
 * Ollama at https://ollama.com/download (used as a temporarily free model)
 * At least 16 GB of GPU VRAM memory (to execute gemma4 model)
@@ -12,10 +12,34 @@ Sample repo for master's degree thesis
     ```shell
     git clone https://github.com/UltimateBeaver/sample-project.git
     cd sample-project
-    python -m venv venv
+    # Replace 3.12 with your actual installed version! Or alternatively use: `python -m venv venv`
+    py -3.12 -m venv venv
     venv/Scripts/activate
+    # Upgrade pip
+    python -m pip install --upgrade pip
     pip install -r requirements.txt
     ```
+
+    **CAUTION**: to avoid the 100% CPU fallback, Windows users who have an **AMD GPU** with Rocm library installed, must choose one of the following options:
+    * Option A (*Suggested*):
+        1. install ROCm Python environment libraries [https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installrad/windows/install-pytorch.html]:
+            ```shell
+            pip install --no-cache-dir `
+            https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/rocm_sdk_core-7.2.1-py3-none-win_amd64.whl `
+            https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/rocm_sdk_devel-7.2.1-py3-none-win_amd64.whl `
+            https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/rocm_sdk_libraries_custom-7.2.1-py3-none-win_amd64.whl `
+            https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/rocm-7.2.1.tar.gz
+            ```
+        2. install torch compiled for ROCm:
+            ```shell
+            pip install --no-cache-dir `
+            https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/torch-2.9.1%2Brocm7.2.1-cp312-cp312-win_amd64.whl `
+            ```
+    * Option B: install this alternative pytorch library, provided by Microsoft:
+        ```shell
+        pip install --force-reinstall torch==2.4.1
+        pip install torch-directml
+        ```
 2. Create a `.env` file on the root directory of the project. Insert your own API keys
     ```bash
     # Hugging Face Token (enables higher rate limits and faster downloads. Sign in to Hugging Face and create a token at https://huggingface.co/settings/tokens)
@@ -57,6 +81,12 @@ Sample repo for master's degree thesis
     # Column names in the input Excel file
     COLUMN_NAME_DATE=DATA
     COLUMN_NAME_PARAGRAPH=ARTICOLO
+    # Translation settings
+    INPUT_LANGUAGE=it
+    TRANSLATION_MODEL_NAME=it-en
+    ENABLE_TRANSLATION=true
+    TRANSLATOR_SENTENCE_BATCH_SIZE=32
+    TRANSLATOR_SENTENCE_MAX_LENGTH=256
     # Polito HPC ssh settings
     HPC_USER=your-ssh-username
     HPC_HOST=hpc-legionlogin.polito.it
@@ -163,3 +193,4 @@ ProviderType.OPENAI: ProviderConfig(
 - [x] Self loop relationships without any sense
 - [x] Entities with empty names
 - [ ] Redundant relationships
+- [ ] Torch DirectML hallucination issues, when using AMD Radeon GPU on Windows 11 (currently, in such scenario, the program uses 100% CPU for translating news paragraphs for maximising accuracy)

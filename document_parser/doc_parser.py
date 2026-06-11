@@ -53,6 +53,7 @@ from difflib import SequenceMatcher
 
 from itext2kg_atom.itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg_atom.itext2kg.atom.models import AtomicFact
+from translation.translator import TranslationService
 
 # Set up logger for this module
 logger = get_logger(__name__)
@@ -295,16 +296,36 @@ class DocumentParser:
     Follows atomicity, decontextualization, temporal normalization, and end actions rules.
     """
     
-    def __init__(self, llm_model, embeddings_model=None):
+    def __init__(self, llm_model, embeddings_model=None, language: str = "en", enable_translation: bool = False):
         """
         Initialize the DocumentParser with LLM and optional embeddings model.
         
         Args:
             llm_model: The language model instance (ChatOllama, ChatOpenAI, etc.)
             embeddings_model: Optional embeddings model for semantic operations
+            language: Input language code ("en", "it", etc.). Default: "en"
+            enable_translation: Whether to automatically translate non-English inputs. Default: False
         """
         self.llm_model = llm_model
         self.embeddings_model = embeddings_model
+        self.language = language
+        self.enable_translation = enable_translation and language != "en"
+        
+        # Initialize translation service if needed
+        self.translator = None
+        if self.enable_translation:
+            try:
+                # Map language to translation model
+                if language == "it":
+                    self.translator = TranslationService(model_name="it-en")
+                    logger.info(f"✅ Translation service initialized for {language}→en")
+                else:
+                    logger.warning(f"Translation for {language} not yet supported. Disabling translation.")
+                    self.enable_translation = False
+            except Exception as e:
+                logger.error(f"Failed to initialize translation service: {e}. Proceeding without translation.")
+                self.enable_translation = False
+        
         self.parser = LangchainOutputParser(
             llm_model=llm_model,
             embeddings_model=embeddings_model
@@ -456,7 +477,6 @@ If a description is generic and non-informative (e.g., "The company XYZ is focus
 - AVOID DUPLICATE: "The company expanded its operations in California" (already covered by the GOOD fact)
 - Extract the more comprehensive fact with entity names rather than generic versions
 
-### 6. 
 
 ## Example of EXHAUSTIVE Extraction
 
@@ -567,6 +587,7 @@ Return the extracted information strictly adhering to the requested format.
     ) -> List[List[str]]:
         """
         Extract atomic facts from multiple paragraphs in parallel (batch processing).
+        Applies translation if configured for non-English inputs.
         
         Args:
             paragraphs: List of raw news paragraph texts
@@ -583,6 +604,7 @@ Return the extracted information strictly adhering to the requested format.
             return []
         
         try:
+            
             # Create system queries for each paragraph (one per observation date)
             system_queries = [
                 self._create_temporal_system_query(obs_date)
@@ -591,10 +613,13 @@ Return the extracted information strictly adhering to the requested format.
             
             # Use LangchainOutputParser batch processing to extract facts from all paragraphs
             # This allows the underlying LLM provider to batch requests efficiently
+            # NOTE: LangchainOutputParser.extract_information_as_json_for_context accepts
+            # either a single system_query or will use the first one for batch processing.
+            # For now, we pass the first system query to avoid issues with per-context routing.
             results = await self.parser.extract_information_as_json_for_context(
                 output_data_structure=AtomicFact,
                 contexts=paragraphs,
-                system_query=system_queries[0]  # Use first system query (they should be similar for batching)
+                system_query=system_queries[0]  # Note: All dates are similar, so first query is representative
             )
             
             # Extract facts from each AtomicFact object
@@ -634,11 +659,14 @@ Return the extracted information strictly adhering to the requested format.
         num_rows_to_process: int = 0, # 0 means process all rows
         doc_parser_enable_parallel_processing: bool = True,
         batch_size: int = 2,
-        apply_post_processing: bool = True
+        apply_post_processing: bool = True,
+        language: str = "en",
+        enable_translation: bool = False
     ) -> pd.DataFrame:
         """
         Read an Excel file, extract atomic facts for each paragraph, and save results.
         Processes paragraphs in parallel batches for improved performance.
+        Supports multilingual input with automatic translation to English.
         
         Args:
             input_excel_path: Path to input Excel file with columns: date, lead_paragraph
@@ -647,6 +675,8 @@ Return the extracted information strictly adhering to the requested format.
             column_name_paragraph: Name of the column containing paragraphs (default: 'lead_paragraph')
             batch_size: Number of paragraphs to process in parallel per batch (default: 2)
             apply_post_processing: Whether to apply post-processing (date normalization, deduplication)
+            language: Input language code ("en", "it", etc.). Default: "en"
+            enable_translation: Whether to enable translation for non-English inputs. Default: False
             
         Returns:
             DataFrame with added factoids_g_truth column
@@ -663,6 +693,23 @@ Return the extracted information strictly adhering to the requested format.
         if column_name_date not in df.columns or column_name_paragraph not in df.columns:
             raise ValueError(f"Excel file must contain '{column_name_date}' and '{column_name_paragraph}' columns")
         
+        # Update language settings if provided
+        if self.language != "en" and self.enable_translation:
+            # Translate the dataset
+            paragraphs = df[column_name_paragraph].tolist()
+            
+            logger.info(f"📝 Translating {len(paragraphs)} paragraphs from {self.language} to English...")
+            try:
+                paragraphs_to_process = self.translator.translate_batch(paragraphs, batch_size=8)
+                logger.info(f"✅ Translation completed for {len(paragraphs_to_process)} paragraphs")
+
+                # Add a new column for translated paragraphs
+                df['translated_paragraph'] = paragraphs_to_process
+                column_name_paragraph = 'translated_paragraph'  # Update to use translated paragraphs for processing
+            except Exception as e:
+                logger.error(f"Translation failed: {e}. Using original paragraphs.")
+
+
         # Create the combined column 'lead_paragraph_observation_date'
         logger.info("Creating 'lead_paragraph_observation_date' column...")
         df['lead_paragraph_observation_date'] = df.apply(

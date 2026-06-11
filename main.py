@@ -34,7 +34,11 @@ def to_dictionary(df:pd.DataFrame):
 ## ------------- Document parsing into atomic facts ------------- ##
 async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
     # Covert xlsx file to pkl format
-    parser = DocumentParser(llm_model=base_llm_model)
+    parser = DocumentParser(
+        llm_model=base_llm_model,
+        language=input_language,
+        enable_translation=enable_translation
+    )
     result_df = await parser.parse_excel(
         input_excel_path=doc_parser_input_excel_path,
         output_excel_path=doc_parser_output_excel_path,
@@ -43,7 +47,9 @@ async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
         num_rows_to_process=num_rows_to_process,
         doc_parser_enable_parallel_processing=doc_parser_enable_parallel_processing,
         batch_size=doc_parser_batch_size,  # Process N paragraphs in parallel per batch
-        apply_post_processing=True  # Enable post-processing
+        apply_post_processing=True,  # Enable post-processing
+        language=input_language,  # Pass input language
+        enable_translation=enable_translation  # Pass translation flag
     )
     print("\n" + "=" * 70)
     print("📊 EXTRACTION RESULTS")
@@ -97,6 +103,12 @@ async def main():
         logger.error("Configuration validation failed. Exiting.")
         return
     
+    # Log language configuration
+    logger.info(f"🌐 Document processing configuration:")
+    logger.info(f"   Input language: {input_language}")
+    logger.info(f"   Translation enabled: {enable_translation}")
+    if enable_translation and input_language != "en":
+        logger.info(f"   Translation model: {translation_model_name}")
 
     df_atomic_facts = await parse_news_paragraphs_into_atomic_facts()
     df_atomic_facts.to_pickle(doc_parser_output_excel_path.replace(".xlsx", ".pkl"))

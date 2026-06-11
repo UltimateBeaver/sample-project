@@ -9,6 +9,9 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/venv"
+            },
             "purpose": ["debug-test"]
         }
     ]

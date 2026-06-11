@@ -23,3 +23,10 @@ doc_parser_enable_parallel_processing = bool(os.getenv("DOC_PARSER_ENABLE_PARALL
 doc_parser_batch_size = int(os.getenv("DOC_PARSER_BATCH_SIZE", 2))
 column_name_date = os.getenv("COLUMN_NAME_DATE", "date")
 column_name_paragraph = os.getenv("COLUMN_NAME_PARAGRAPH", "lead_paragraph")
+
+# Language configuration
+input_language = os.getenv("INPUT_LANGUAGE", "en")  # Source language ("en", "it", etc.)
+translation_model_name = os.getenv("TRANSLATION_MODEL_NAME", "it-en")  # Language pair for translation
+enable_translation = os.getenv("ENABLE_TRANSLATION", "false").lower() == "true"  # Auto-translate if not English
+translator_sentence_batch_size = int(os.getenv("TRANSLATOR_SENTENCE_BATCH_SIZE", 32))   # Batch size for sentence processing
+translator_sentence_max_length = int(os.getenv("TRANSLATOR_SENTENCE_MAX_LENGTH", 256))  # Max length for sentence translation

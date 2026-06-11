@@ -73,6 +73,12 @@ In this guide there will be several steps in which you are required to copy-past
     # Column names in the input Excel file
     COLUMN_NAME_DATE=DATA
     COLUMN_NAME_PARAGRAPH=ARTICOLO
+    # Translation settings
+    INPUT_LANGUAGE=it
+    TRANSLATION_MODEL_NAME=it-en
+    ENABLE_TRANSLATION=true
+    TRANSLATOR_SENTENCE_BATCH_SIZE=32
+    TRANSLATOR_SENTENCE_MAX_LENGTH=256
     # Polito HPC ssh settings
     HPC_USER=your-ssh-username
     HPC_HOST=hpc-legionlogin.polito.it
