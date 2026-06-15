@@ -288,7 +288,8 @@ class LangchainOutputParser(LLMOutputParserInterface):
                                                     # DIRECTIVES :
                                                     - Act like an experienced information extractor.
                                                     - If you do not find the right information, keep its place empty.
-                                                    ''') -> List[Any]:
+                                                    ''',
+                                                    json_schema_enabled = False) -> List[Any]:
         """
         Prepares prompts for each context, calculates token counts, splits the prompts into batches
         that respect provider-specific API constraints, and processes them with appropriate error handling.
@@ -313,9 +314,13 @@ class LangchainOutputParser(LLMOutputParserInterface):
                 f"Number of contexts ({len(contexts):,}) exceeds {self.config.name}'s "
                 f"{self.config.max_pending_requests:,} request limit"
             )
-            
-        structured_llm = self.model.with_structured_output(output_data_structure)
         
+        structured_llm = None
+        if json_schema_enabled:
+            structured_llm = self.model.with_structured_output(output_data_structure, method="json_schema")
+        else:
+            structured_llm = self.model.with_structured_output(output_data_structure)
+
         # Create prompts for each context
         start_prompt = time.time()
         all_prompts = [
@@ -415,7 +420,7 @@ class LangchainOutputParser(LLMOutputParserInterface):
                         "parse" in error_message
                     )
                     
-                    if is_json_error and self.provider_type == ProviderType.OLLAMA:
+                    if is_json_error:
                         # Log detailed info about JSON errors for Ollama
                         logger.warning(f"⚠️  JSON/Schema parsing error in batch {i+1}, attempt {attempt+1}/{max_retries+1}")
                         logger.debug(f"   Full error: {full_error}")

@@ -25,13 +25,13 @@ import pandas as pd
 import numpy as np
 
 
-from langchain_mistralai import ChatMistralAI
-from langchain_mistralai import MistralAIEmbeddings
+# from langchain_mistralai import ChatMistralAI
+# from langchain_mistralai import MistralAIEmbeddings
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg.atom.models import AtomicFact
-from langchain_anthropic import ChatAnthropic
+# from langchain_anthropic import ChatAnthropic
 
 
 # Add the project root to Python path
@@ -57,35 +57,35 @@ logger.info("Setting up API connections...")
 # Global configuration vars
 # ==========================
 # Paths
-INPUT_DATASET_PATH: Path = project_root / "datasets" / "nyt_news" / "2020_nyt_COVID_last_version_ready.pkl"
-OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "nyt_news" / "2020_nyt_COVID_last_version_ready_factoids_claude.pkl"
+INPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "nyt_news" / "2020_nyt_COVID_last_version_ready.pkl"
+OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "nyt_news" / "2020_nyt_COVID_last_version_ready_factoids_llamacpp.pkl"
 
 # Column names
 # It could be used on the cumulative lead_paragraph_observation_date. You can change "lead_paragraph_observation_date" 
 # to "cumul_lead_paragraph_observation_date" if you want to use the cumulative lead_paragraph_observation_date.
 PARAGRAPHS_COL_NAME: str = "lead_paragraph_observation_date"
-FACTOIDS_COL_NAME: str = "factoids_claude"
+FACTOIDS_COL_NAME: str = "factoids_llamacpp"
 
 # Sampling: number of uniformly spaced indices to process. Set to None or 0 to process all
 SAMPLER_K: int | None = None
 
 # Batch processing configuration
 BATCH_SIZE: int = 10  # Process 5 contexts per batch
-CHECKPOINT_FILE: Path = project_root / "datasets" / "nyt_news" / "factoids_checkpoint.json"
+CHECKPOINT_FILE: Path = project_root / "datasets" / "atom" / "nyt_news" / "factoids_checkpoint.json"
 
-mistral_api_key = "###"
-mistral_llm_model = ChatMistralAI(
-    api_key = mistral_api_key,
-    model="mistral-large-latest",
-    temperature=0,
-    max_retries=2,
-)
+# mistral_api_key = "###"
+# mistral_llm_model = ChatMistralAI(
+#     api_key = mistral_api_key,
+#     model="mistral-large-latest",
+#     temperature=0,
+#     max_retries=2,
+# )
 
 
-mistral_embeddings_model = MistralAIEmbeddings(
-    model="mistral-embed",
-    api_key = mistral_api_key
-)
+# mistral_embeddings_model = MistralAIEmbeddings(
+#     model="mistral-embed",
+#     api_key = mistral_api_key
+# )
 
 
 openai_api_key = "###"
@@ -103,16 +103,16 @@ openai_llm_model = ChatOpenAI(
     max_retries=2,
 )
 
-claude_api_key = "###"
+# claude_api_key = "###"
 
-claude_llm_model = ChatAnthropic(
-    api_key= claude_api_key,
-    model="claude-sonnet-4-20250514",
-    temperature=0,
-    timeout=None,
-    max_tokens=64000,
-    max_retries=2,
-)
+# claude_llm_model = ChatAnthropic(
+#     api_key= claude_api_key,
+#     model="claude-sonnet-4-20250514",
+#     temperature=0,
+#     timeout=None,
+#     max_tokens=64000,
+#     max_retries=2,
+# )
 
 
 openai_embeddings_model = OpenAIEmbeddings(
@@ -120,9 +120,23 @@ openai_embeddings_model = OpenAIEmbeddings(
     model="text-embedding-3-large",
 )
 
+# --- Local / Native Llama.cpp Server --------------------------------------
+model_llamacpp_gemma4 = ChatOpenAI(
+    api_key=openai_api_key,
+    base_url="http://localhost:8080/v1",
+    model="gemma4",  # The server ignores this string, but ChatOpenAI requires it
+    temperature=0,
+)
+# --- Local / Native Llama.cpp Embeddings ----------------------------------
+embeddings_llamacpp_nomic = OpenAIEmbeddings(
+    api_key="llama_cpp", # Dummy key required by LangChain
+    base_url="http://localhost:8081/v1",
+    model="nomic-embed-text", 
+)
+
 lg_kg_construction = LangchainOutputParser(
-   llm_model=claude_llm_model,
-   embeddings_model=openai_embeddings_model
+   llm_model=model_llamacpp_gemma4,
+   embeddings_model=embeddings_llamacpp_nomic
 )
 
 logger.info("✅ LangchainOutputParser initialized successfully")

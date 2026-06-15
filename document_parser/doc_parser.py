@@ -619,7 +619,8 @@ Return the extracted information strictly adhering to the requested format.
             results = await self.parser.extract_information_as_json_for_context(
                 output_data_structure=AtomicFact,
                 contexts=paragraphs,
-                system_query=system_queries[0]  # Note: All dates are similar, so first query is representative
+                system_query=system_queries[0],  # Note: All dates are similar, so first query is representative
+                json_schema_enabled=True
             )
             
             # Extract facts from each AtomicFact object
@@ -628,7 +629,7 @@ Return the extracted information strictly adhering to the requested format.
                 if hasattr(atomic_fact_obj, 'atomic_fact'):
                     facts = atomic_fact_obj.atomic_fact
                 else:
-                    logger.warning(f"Unexpected result structure for paragraph {i}: {atomic_fact_obj}")
+                    logger.warning(f"Unexpected result structure for paragraph {i}: {atomic_fact_obj} with obs_date {obs_date}")
                     facts = []
                 
                 # Apply post-processing

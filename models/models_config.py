@@ -115,6 +115,7 @@ model_llamacpp_gemma4 = ChatOpenAI(
     base_url=openai_api_base,
     model="gemma4",  # The server ignores this string, but ChatOpenAI requires it
     temperature=0,
+    streaming=False, # Disable streaming explicitly to avoid JSON parsing issues with incomplete output. By default, LangChain tries to stream LLM responses token-by-token (like watching ChatGPT type in real-time)
 )
 
 # --- Local / LMstudio (using OpenAI API) -------------------
