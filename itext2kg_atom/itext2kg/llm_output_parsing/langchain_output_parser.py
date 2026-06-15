@@ -9,6 +9,13 @@ from .llm_output_parser_interface import LLMOutputParserInterface
 from itext2kg.logging_config import get_logger
 from dataclasses import dataclass
 from enum import Enum
+from env_config import (
+    provider_openai_max_elements_per_batch,
+    provider_openai_max_tokens_per_batch,
+    provider_openai_max_context_window,
+    provider_ollama_max_elements_per_batch,
+    provider_ollama_max_tokens_per_batch,
+    provider_ollama_max_context_window)
 
 # Set up logger for this module
 logger = get_logger(__name__)
@@ -47,9 +54,9 @@ PROVIDER_CONFIGS = {
         # OLD CONFIG # max_pending_requests=None,   # OpenAI doesn't have explicit pending request limits
         # OLD CONFIG # sleep_between_batches=2.0,   # Short delay + let OpenAI's built-in rate limiting handle the rest
         name="llama.cpp (Local)",
-        max_elements_per_batch=8,    # Process ONE request at a time to avoid memory issues
-        max_tokens_per_batch=8192,   # Very conservative token limit
-        max_context_window=16384,    # Typical for local models
+        max_elements_per_batch=provider_openai_max_elements_per_batch,
+        max_tokens_per_batch=provider_openai_max_tokens_per_batch,
+        max_context_window=provider_openai_max_context_window,
         max_pending_requests=None,
         #sleep_between_batches=0.1,   # Small delay between requests
     ),
@@ -74,9 +81,9 @@ PROVIDER_CONFIGS = {
         # OLD CONFIG # max_elements_per_batch=32,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
         # OLD CONFIG # max_tokens_per_batch=12000,   # Increased to 12K per request (local inference, not API limits)
         # OLD CONFIG # max_context_window=32768,   # Ollama context window
-        max_elements_per_batch=8,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
-        max_tokens_per_batch=8192,   # Increased to 12K per request (local inference, not API limits)
-        max_context_window=16384,   # Ollama context window
+        max_elements_per_batch=provider_ollama_max_elements_per_batch,
+        max_tokens_per_batch=provider_ollama_max_tokens_per_batch,
+        max_context_window=provider_ollama_max_context_window,
         max_pending_requests=None,   # Ollama doesn't have explicit pending request limits
         #sleep_between_batches=0.1,   # 100ms between batches to prevent GPU thrashing
     ),

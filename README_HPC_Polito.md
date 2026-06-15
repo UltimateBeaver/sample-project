@@ -48,6 +48,16 @@ In this guide there will be several steps in which you are required to copy-past
     # Represents the total global pool shared across all parallel slots
     LLAMACPP_MODEL_CONTEXT_SIZE=32768
     LLAMACPP_EMBED_CONTEXT_SIZE=2048
+    ### Langchain Output Parser: Provider-specific configurations
+    # ProviderType.OPENAI
+    PROVIDER_OPENAI_MAX_ELEMENTS_PER_BATCH=8
+    PROVIDER_OPENAI_MAX_TOKENS_PER_BATCH=20000
+    PROVIDER_OPENAI_MAX_CONTEXT_WINDOW=32768
+    # ProviderType.OLLAMA
+    PROVIDER_OLLAMA_MAX_ELEMENTS_PER_BATCH=8
+    PROVIDER_OLLAMA_MAX_TOKENS_PER_BATCH=8192
+    PROVIDER_OLLAMA_MAX_CONTEXT_WINDOW=16384
+    ###
     # Max. number of layers to store in VRAM, either an exact number, 'auto', or 'all' (default: auto)
     LLAMACPP_MODEL_NGL=99
     LLAMACPP_EMBED_NGL=99

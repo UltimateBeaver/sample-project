@@ -15,6 +15,14 @@ neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 neo4j_username = os.getenv("NEO4J_USERNAME")
 neo4j_password = os.getenv("NEO4J_PASSWORD")
 
+# Langchain output parser configuration
+provider_openai_max_elements_per_batch =    int(os.getenv("PROVIDER_OPENAI_MAX_ELEMENTS_PER_BATCH"))
+provider_openai_max_tokens_per_batch =      int(os.getenv("PROVIDER_OPENAI_MAX_TOKENS_PER_BATCH"))
+provider_openai_max_context_window =        int(os.getenv("PROVIDER_OPENAI_MAX_CONTEXT_WINDOW"))
+provider_ollama_max_elements_per_batch =    int(os.getenv("PROVIDER_OLLAMA_MAX_ELEMENTS_PER_BATCH"))
+provider_ollama_max_tokens_per_batch =      int(os.getenv("PROVIDER_OLLAMA_MAX_TOKENS_PER_BATCH"))
+provider_ollama_max_context_window =        int(os.getenv("PROVIDER_OLLAMA_MAX_CONTEXT_WINDOW"))
+
 # Static constants
 num_rows_to_process = abs(int(os.getenv("NUM_ROWS_TO_PROCESS", 0)))  # 0 means process all rows
 doc_parser_input_excel_path = os.getenv("DOC_PARSER_INPUT_EXCEL_PATH", "./data/dataset.xlsx")
