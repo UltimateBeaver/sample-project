@@ -203,4 +203,4 @@ ProviderType.OPENAI: ProviderConfig(
 - [x] Self loop relationships without any sense
 - [x] Entities with empty names
 - [ ] Redundant relationships
-- [ ] Torch DirectML hallucination issues, when using AMD Radeon GPU on Windows 11 (currently, in such scenario, the program uses 100% CPU for translating news paragraphs for maximising accuracy)
+- [ ] Italian names are translated as well (ie: Mario Draghi becomes Mario Dragons)
