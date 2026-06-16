@@ -10,6 +10,12 @@ import logging
 from typing import List, Optional, Tuple
 from functools import lru_cache
 import torch
+import re
+try:
+    import spacy
+    HAS_SPACY = True
+except ImportError:
+    HAS_SPACY = False
 
 try:
     from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, MarianMTModel, MarianTokenizer
@@ -118,6 +124,17 @@ class TranslationService:
             self.device = _detect_best_device()
         else:
             self.device = device
+
+        # Load Spacy for Entity Masking
+        self.nlp = None
+        if HAS_SPACY:
+            try:
+                self.nlp = spacy.load("it_core_news_sm")
+                logger.info("Spacy NER loaded for entity masking.")
+            except OSError:
+                logger.warning("Spacy model 'it_core_news_sm' not found. Entity masking disabled.")
+        else:
+            logger.warning("Spacy library not installed. Entity masking disabled.")
         
         # Initialize model components (lazy loaded on first use)
         self.translator = None  # Flag to indicate if models are loaded
@@ -251,9 +268,18 @@ class TranslationService:
             try:
                 logger.debug(f"Translating sentence batch {batch_num}/{total_batches} ({len(batch)} sentences)...")
                 
+                # Mask entities before translation
+                if HAS_SPACY:
+                    masked_batch = []
+                    batch_mappings = []
+                    for s in batch:
+                        masked_s, mapping = self._mask_entities(s)
+                        masked_batch.append(masked_s)
+                        batch_mappings.append(mapping)
+
                 # Tokenize batch with the safe sentence length
                 inputs = self.tokenizer(
-                    batch, 
+                    masked_batch if HAS_SPACY else batch, 
                     return_tensors="pt", 
                     padding=True, 
                     max_length=sentence_max_length, 
@@ -277,9 +303,12 @@ class TranslationService:
                         # eos_token_id=self.tokenizer.eos_token_id
                     )
                 
-                # Decode batch
-                for translated_id in translated_ids:
+                # Decode batch and unmask entities
+                for idx, translated_id in enumerate(translated_ids):
                     translated_text = self.tokenizer.decode(translated_id, skip_special_tokens=True)
+                    if HAS_SPACY:
+                        # Unmask entities after translation
+                        translated_text = self._unmask_entities(translated_text, batch_mappings[idx])
                     flat_translated_sentences.append(translated_text)
                 
                 logger.debug(f"Sentence batch {batch_num}/{total_batches} completed")
@@ -327,6 +356,37 @@ class TranslationService:
         metadata = list(zip(texts, translated_texts))
         return translated_texts, metadata
 
+
+    def _mask_entities(self, text: str) -> Tuple[str, dict]:
+        """Replaces proper nouns with neutral placeholders."""
+        if not self.nlp:
+            return text, {}
+        
+        doc = self.nlp(text)
+        masked_text = text
+        mapping = {}
+        
+        # Extract Persons (PER) and Organizations (ORG)
+        entities = [ent.text for ent in doc.ents if ent.label_ in ['PER', 'ORG']]
+        # Sort by length descending to avoid partial matches (e.g., replacing "Giuseppe" before "Giuseppe Castagna")
+        entities = sorted(list(set(entities)), key=len, reverse=True)
+        
+        for i, ent in enumerate(entities):
+            placeholder = f"NAMEX{i}X" 
+            mapping[placeholder] = ent
+            # Replace exact words using word boundaries
+            masked_text = re.sub(rf'\b{re.escape(ent)}\b', placeholder, masked_text)
+            
+        return masked_text, mapping
+
+    def _unmask_entities(self, text: str, mapping: dict) -> str:
+        """Restores the original proper nouns from placeholders."""
+        unmasked_text = text
+        for placeholder, original_entity in mapping.items():
+            # Case-insensitive replacement in case the translator alters placeholder casing
+            pattern = re.compile(re.escape(placeholder), re.IGNORECASE)
+            unmasked_text = pattern.sub(original_entity, unmasked_text)
+        return unmasked_text
 
 # Convenience function for simple usage
 def create_translator(
