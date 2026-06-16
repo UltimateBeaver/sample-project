@@ -19,6 +19,15 @@ Sample repo for master's degree thesis
     python -m pip install --upgrade pip
     pip install -r requirements.txt
     ```
+    <br>
+    To check if Cuda (NVIDIA or AMD ROCm supported wheel) is supported, run the following commands:
+    ```python
+    python
+    import torch
+    print(torch.cuda.is_available())  # Should return True!
+    print(torch.cuda.get_device_name(0))  # Should print the model of your detected GPU "NVIDIA ... or AMD ..."
+    quit()
+    ```
 
     **CAUTION**: to avoid the 100% CPU fallback, Windows users who have an **AMD GPU** with Rocm library installed, must choose one of the following options:
     * Option A (*Suggested*):
@@ -189,15 +198,6 @@ ProviderType.OPENAI: ProviderConfig(
 - If you encounter crashes or instability issues of llama.cpp model server, change the num-parallel parameter to `-np 1`. 
 <br>Processing multiple reasoning streams at the same time on a single local GPU heavily degrades individual latency. Running them sequentially is actually more practical because a single request gets 100% of your GPU's compute. -np 1 tells the engine to completely disable multi-slot context blending.
 
-- to check if Cuda (AMD ROCm supported wheel) is supported, run the following commands:
-    ```python
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6
-    python
-    import torch
-    print(torch.cuda.is_available())  # Should return True!
-    print(torch.cuda.get_device_name(0))  # Should print "AMD Radeon ..."
-    quit()
-    ```
 
 # Bugfix Checklist
 - [x] Self loop relationships without any sense

@@ -28,7 +28,18 @@ In this guide there will be several steps in which you are required to copy-past
     python -m venv venv
     source venv/bin/activate
     pip install --upgrade pip
+    # Install the specific torch build compiled for CUDA 12.4
+    pip install torch --index-url https://download.pytorch.org/whl/cu124
     pip install -r requirements.txt
+    ```
+    <br>
+    To check if Cuda (NVIDIA or AMD ROCm supported wheel) is supported, run the following commands:
+    ```python
+    python
+    import torch
+    print(torch.cuda.is_available())  # Should return True!
+    print(torch.cuda.get_device_name(0))  # Should print the model of your detected GPU "NVIDIA ... or AMD ..."
+    quit()
     ```
 2. Create a `.env` file on the root directory of the project. Insert your own API keys
     ```bash
