@@ -317,7 +317,7 @@ class DocumentParser:
             try:
                 # Map language to translation model
                 if language == "it":
-                    self.translator = TranslationService(model_name="it-en")
+                    self.translator = TranslationService(llm_model=llm_model)
                     logger.info(f"✅ Translation service initialized for {language}→en")
                 else:
                     logger.warning(f"Translation for {language} not yet supported. Disabling translation.")
@@ -695,11 +695,11 @@ Return the extracted information strictly adhering to the requested format.
             raise ValueError(f"Excel file must contain '{column_name_date}' and '{column_name_paragraph}' columns")
         
         # Update language settings if provided
-        if self.language != "en" and self.enable_translation:
+        if language != "en" and enable_translation:
             # Translate the dataset
             paragraphs = df[column_name_paragraph].tolist()
             
-            logger.info(f"📝 Translating {len(paragraphs)} paragraphs from {self.language} to English...")
+            logger.info(f"📝 Translating {len(paragraphs)} paragraphs from {language} to English...")
             try:
                 paragraphs_to_process = self.translator.translate_batch(paragraphs, batch_size=8)
                 logger.info(f"✅ Translation completed for {len(paragraphs_to_process)} paragraphs")
