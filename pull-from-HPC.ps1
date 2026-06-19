@@ -34,15 +34,16 @@ Write-Host "=============================================" -ForegroundColor Cyan
 # ---------------------------------------------------------
 # STEP 1: RAW OVERWRITE LOGS
 # ---------------------------------------------------------
-Write-Host "`n[1/4] Overwriting local logs directory..." -ForegroundColor Yellow
-if (Test-Path $LOCAL_LOGS_DIR) {
-    Write-Host "Removing old logs directory to ensure a raw overwrite..." -ForegroundColor Gray
-    Remove-Item -Recurse -Force $LOCAL_LOGS_DIR
-}
+# Not needed anymore, since I can use vscode extension to read/write remote files directly. But leaving it here for reference.
+# Write-Host "`n[1/4] Overwriting local logs directory..." -ForegroundColor Yellow
+# if (Test-Path $LOCAL_LOGS_DIR) {
+#     Write-Host "Removing old logs directory to ensure a raw overwrite..." -ForegroundColor Gray
+#     Remove-Item -Recurse -Force $LOCAL_LOGS_DIR
+# }
 
 # Download the entire directory structure down cleanly
-scp -r "${HPC_USER}@${HPC_HOST}:${REMOTE_LOGS}" $LOCAL_PROJECT_ROOT
-Write-Host "Logs directory completely overwritten." -ForegroundColor Green
+# scp -r "${HPC_USER}@${HPC_HOST}:${REMOTE_LOGS}" $LOCAL_PROJECT_ROOT
+# Write-Host "Logs directory completely overwritten." -ForegroundColor Green
 
 # ---------------------------------------------------------
 # STEP 2: DOWNLOAD NEO4J DUMP
