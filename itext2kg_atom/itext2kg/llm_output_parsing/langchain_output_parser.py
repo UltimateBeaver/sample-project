@@ -323,10 +323,11 @@ class LangchainOutputParser(LLMOutputParserInterface):
             )
         
         structured_llm = None
-        if json_schema_enabled:
-            structured_llm = self.model.with_structured_output(output_data_structure, method="json_schema")
-        else:
-            structured_llm = self.model.with_structured_output(output_data_structure)
+        # if json_schema_enabled:
+        #     structured_llm = self.model.with_structured_output(output_data_structure, method="json_schema")
+        # else:
+        #     structured_llm = self.model.with_structured_output(output_data_structure)
+        structured_llm = self.model.with_structured_output(output_data_structure, method="json_schema")
 
         # Create prompts for each context
         start_prompt = time.time()
