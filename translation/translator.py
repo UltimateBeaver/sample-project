@@ -269,6 +269,37 @@ Italian text:
         return translated_texts, metadata
 
 
+    def _mask_entities(self, text: str) -> Tuple[str, dict]:
+        """Replaces proper nouns with neutral placeholders."""
+        if not self.nlp:
+            return text, {}
+        
+        doc = self.nlp(text)
+        masked_text = text
+        mapping = {}
+        
+        # Extract Persons (PER) and Organizations (ORG)
+        entities = [ent.text for ent in doc.ents if ent.label_ in ['PER', 'ORG']]
+        # Sort by length descending to avoid partial matches (e.g., replacing "Giuseppe" before "Giuseppe Castagna")
+        entities = sorted(list(set(entities)), key=len, reverse=True)
+        
+        for i, ent in enumerate(entities):
+            placeholder = f"NAMEX{i}X" 
+            mapping[placeholder] = ent
+            # Replace exact words using word boundaries
+            masked_text = re.sub(rf'\b{re.escape(ent)}\b', placeholder, masked_text)
+            
+        return masked_text, mapping
+
+    def _unmask_entities(self, text: str, mapping: dict) -> str:
+        """Restores the original proper nouns from placeholders."""
+        unmasked_text = text
+        for placeholder, original_entity in mapping.items():
+            # Case-insensitive replacement in case the translator alters placeholder casing
+            pattern = re.compile(re.escape(placeholder), re.IGNORECASE)
+            unmasked_text = pattern.sub(original_entity, unmasked_text)
+        return unmasked_text
+
 # Convenience function for simple usage
 def create_translator(
     language_pair: str = "it-en",
