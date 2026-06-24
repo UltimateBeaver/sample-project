@@ -6,15 +6,22 @@ This module provides a TranslationService class that handles language translatio
 with caching and error handling.
 """
 
+import json
 import logging
-from typing import List, Optional, Tuple
+import re
+from typing import List, Optional, Tuple, Union
 from functools import lru_cache
+from pydantic import BaseModel, Field
 import torch
 
-from env_config import translator_sentence_batch_size, translator_sentence_max_length
 from itext2kg_atom.itext2kg.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+class TranslationResult(BaseModel):
+    """Schema representing the translation and analyzed sentiment value."""
+    translation: str = Field(description="The accurate financial translation of the text in English.")
+    sentiment: float = Field(description="A honest sentiment assessment of the translation on a 1 to 5 scale.")
 
 
 def _detect_best_device() -> str:
@@ -64,8 +71,8 @@ def _detect_best_device() -> str:
 
 class TranslationService:
     """
-    Agentic Translation service for multilingual financial document support.
-    Uses a 3-stage reflection workflow with a local LLM to optimize accuracy.
+    Translation service for multilingual financial document support.
+    Utilizes LangChain structured outputs with schema enforcement to prevent JSON syntax errors.
     """
     
     
@@ -81,8 +88,19 @@ class TranslationService:
         """
         
         
-        self.model = llm_model
+        self.raw_model = llm_model
         self.cache_dir = cache_dir
+
+        # Bind the Pydantic schema structure using native "json_schema" method
+        try:
+            self.model = self.raw_model.with_structured_output(
+                TranslationResult, 
+                method="json_schema"
+            )
+            logger.info("Successfully bound structured output (json_schema) to TranslationService.")
+        except Exception as e:
+            logger.warning(f"Could not initialize with_structured_output natively: {e}. Falling back to standard model.")
+            self.model = self.raw_model
         
         # Auto-detect device if not specified
         if device is None:
@@ -91,14 +109,13 @@ class TranslationService:
             self.device = device
         
         logger.info(
-            f"Agentic TranslationService initialized using local LLM."
+            f"TranslationService initialized using local LLM."
             f"(device: {self.device})"
         )
     
-    
     def _translate_single_text(self, text: str) -> str:
         """Translates a single piece of text using an initial translation -> critique -> refine loop."""
-        
+
         # # Stage 1: Initial Translation Agent
         # prompt_1 = (
         #     "You are an expert translator specializing in Italian-to-English financial news.\n"
@@ -152,24 +169,91 @@ class TranslationService:
             f"Italian Text:\n{text}\n\n"
             "Final English Translation (Output only the translated text, nothing else):"
         )
-        response = self.model.invoke(prompt)
+
+        response = self.raw_model.invoke(prompt)
         final_translation = response.content.strip() if hasattr(response, 'content') else str(response).strip()
 
         return final_translation
+
     
-    def translate_batch(self, texts: List[str], batch_size: int = 1) -> List[str]:
+    def _translate_single_text(self, text: str, sentiment: float) -> Tuple[str, float]:
+        """Translates a single piece of text using an initial translation -> critique -> refine loop."""
+        
+        # Alternative implementation: single-prompt translation with sentiment and terminology checks
+        prompt = f"""
+You are an expert translator specializing in Italian-to-English financial news.
+You will be provided with an Italian text already labelled with a **Sentiment** value (general linguistic tone) on a scale from 1 to 5, with increments of 0.5.
+
+**REFERENCE SCALE:**
+- 1 = very negative
+- 2 = negative  
+- 3 = neutral
+- 4 = positive
+- 5 = very positive
+
+**Intermediate values (1.5, 2.5, 3.5, 4.5) are nuances between two adjacent categories:**
+- 1.5 = between very negative and negative
+- 2.5 = between negative and neutral
+- 3.5 = between neutral and positive
+- 4.5 = between positive and very positive
+
+Your task is to translate the following Italian text into English and provide a honest sentiment assessment of the translation. Follow these strict guidelines:
+- During the translation, try to maintain the exact financial sentiment, nuance, and market tone (bearish/bullish).
+- CRITICAL: Surnames, proper nouns, and corporate brand names must never be translated literally.
+- Ensure accurate and technical financial terminology matching standard English economic reporting.
+- After translating, make a honest assessment of your translation, providing a sentiment value on the same 1 to 5 scale.
+
+**INPUT**
+Sentiment value: {sentiment}
+Italian text: 
+{text}
+"""
+
+        try:
+            response = self.model.invoke(prompt)
+            if isinstance(response, TranslationResult):
+                return response.translation, response.sentiment
+            # Defensive fallback if result was returned as a dict instead of a parsed Pydantic object
+            if isinstance(response, dict):
+                return response.get("translation", ""), float(response.get("sentiment", sentiment))
+            raise ValueError(f"Returned object type is unexpected: {type(response)}")
+        except Exception as e:
+            logger.error(f"Error during structured translation execution: {e}. Falling back to default values.")
+            # Graceful pipeline degradation: return original text and raw sentiment instead of halting execution
+            return text, sentiment
+
+        # response = self.model.invoke(prompt)
+        # raw_json_string = response.content.strip() if hasattr(response, 'content') else str(response).strip()
+        # try:
+        #     # Filter out any non-JSON content before parsing
+        #     json_match = re.search(r'(\{.*\})', raw_json_string, re.DOTALL)
+        #     if not json_match:
+        #         raise json.JSONDecodeError(f"JSON parsing failed")
+        #     json_data = json.loads(json_match.group(1))
+        #     final_translation, final_sentiment = json_data.get("translation", ""), json_data.get("sentiment", sentiment)
+        # except Exception as e:
+        #     logger.error(f"Error parsing JSON response: {e}. Raw response: {raw_json_string}")
+        #     raise json.JSONDecodeError(f"Invalid JSON response: {raw_json_string}") from e
+
+        # return final_translation, final_sentiment
+    
+    def translate_batch(self, paragraphs: List[str], sentiments: List[float] = [], batch_size: int = 1) -> List[str]:
         """Processes the texts sequentially or in small steps."""
         translated_texts = []
-        total = len(texts)
+        total = len(paragraphs)
         
-        for i, text in enumerate(texts):
-            logger.debug(f"Agentic Translation processing text {i+1}/{total}...")
+        for i, text in enumerate(paragraphs):
+            logger.debug(f"Translating text {i+1}/{total}...")
             if not text.strip():
                 translated_texts.append("")
                 continue
             
             try:
-                final_tx = self._translate_single_text(text)
+                if sentiments != []:
+                    final_tx, sentiment_translated = self._translate_single_text(text, sentiments[i])
+                    logger.debug(f"Original sentiment: {sentiments[i]}, Translated sentiment: {sentiment_translated}")
+                else:
+                    final_tx = self._translate_single_text(text)
                 translated_texts.append(final_tx)
             except Exception as e:
                 logger.error(f"Error translating text {i+1}: {e}")
@@ -178,10 +262,10 @@ class TranslationService:
         return translated_texts
     
     def translate_with_metadata(
-            self, texts: List[str], observation_dates: List[str], batch_size: int = 1
+            self, paragraphs: List[str], observation_dates: List[str], batch_size: int = 1
         ) -> Tuple[List[str], List[Tuple[str, str]]]:
-        translated_texts = self.translate_batch(texts, batch_size=batch_size)
-        metadata = list(zip(texts, translated_texts))
+        translated_texts = self.translate_batch(paragraphs, batch_size=batch_size)
+        metadata = list(zip(paragraphs, translated_texts))
         return translated_texts, metadata
 
 

@@ -296,32 +296,25 @@ class DocumentParser:
     Follows atomicity, decontextualization, temporal normalization, and end actions rules.
     """
     
-    def __init__(self, llm_model, embeddings_model=None, language: str = "en", enable_translation: bool = False):
+    def __init__(self, llm_model, embeddings_model=None, enable_translation: bool = False):
         """
         Initialize the DocumentParser with LLM and optional embeddings model.
         
         Args:
             llm_model: The language model instance (ChatOllama, ChatOpenAI, etc.)
             embeddings_model: Optional embeddings model for semantic operations
-            language: Input language code ("en", "it", etc.). Default: "en"
             enable_translation: Whether to automatically translate non-English inputs. Default: False
         """
         self.llm_model = llm_model
         self.embeddings_model = embeddings_model
-        self.language = language
-        self.enable_translation = enable_translation and language != "en"
+        self.enable_translation = enable_translation
         
         # Initialize translation service if needed
         self.translator = None
         if self.enable_translation:
             try:
-                # Map language to translation model
-                if language == "it":
-                    self.translator = TranslationService(llm_model=llm_model)
-                    logger.info(f"✅ Translation service initialized for {language}→en")
-                else:
-                    logger.warning(f"Translation for {language} not yet supported. Disabling translation.")
-                    self.enable_translation = False
+                self.translator = TranslationService(llm_model=llm_model)
+                logger.info(f"✅ Translation service initialized for ita→eng")
             except Exception as e:
                 logger.error(f"Failed to initialize translation service: {e}. Proceeding without translation.")
                 self.enable_translation = False
@@ -657,11 +650,11 @@ Return the extracted information strictly adhering to the requested format.
         output_excel_path: Optional[str] = None,
         column_name_date: str = 'date',
         column_name_paragraph: str = 'lead_paragraph',
+        column_name_sentiment: str = 'sentiment_score',
         num_rows_to_process: int = 0, # 0 means process all rows
         doc_parser_enable_parallel_processing: bool = True,
         batch_size: int = 2,
         apply_post_processing: bool = True,
-        language: str = "en",
         enable_translation: bool = False
     ) -> pd.DataFrame:
         """
@@ -676,7 +669,6 @@ Return the extracted information strictly adhering to the requested format.
             column_name_paragraph: Name of the column containing paragraphs (default: 'lead_paragraph')
             batch_size: Number of paragraphs to process in parallel per batch (default: 2)
             apply_post_processing: Whether to apply post-processing (date normalization, deduplication)
-            language: Input language code ("en", "it", etc.). Default: "en"
             enable_translation: Whether to enable translation for non-English inputs. Default: False
             
         Returns:
@@ -694,14 +686,27 @@ Return the extracted information strictly adhering to the requested format.
         if column_name_date not in df.columns or column_name_paragraph not in df.columns:
             raise ValueError(f"Excel file must contain '{column_name_date}' and '{column_name_paragraph}' columns")
         
+        # Validate optional columns
+        sentiments = []
+        if column_name_sentiment not in df.columns:
+            logger.warning(f"Column '{column_name_sentiment}' not found in Excel. Sentiment analysis will be skipped.")
+        else:
+            sentiments_str = df[column_name_sentiment].tolist()
+            for s in sentiments_str:
+                extracted_float = float(match.group(1)) if(match := re.search(r'^(\d+\.?\d*)', s)) else None
+                if extracted_float is not None:
+                    sentiments.append(extracted_float)
+                else:
+                    logger.error(f"Could not extract float from sentiment value '{s}'. Defaulting to 3.0")
+                    sentiments.append(3.0)
+
         # Update language settings if provided
-        if language != "en" and enable_translation:
+        if self.enable_translation:
             # Translate the dataset
             paragraphs = df[column_name_paragraph].tolist()
-            
-            logger.info(f"📝 Translating {len(paragraphs)} paragraphs from {language} to English...")
+            logger.info(f"📝 Translating {len(paragraphs)} paragraphs from Italian to English...")
             try:
-                paragraphs_to_process = self.translator.translate_batch(paragraphs, batch_size=8)
+                paragraphs_to_process = self.translator.translate_batch(paragraphs, sentiments, batch_size=8)
                 logger.info(f"✅ Translation completed for {len(paragraphs_to_process)} paragraphs")
 
                 # Add a new column for translated paragraphs
