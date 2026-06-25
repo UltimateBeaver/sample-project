@@ -48,7 +48,7 @@ async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
         doc_parser_enable_parallel_processing=doc_parser_enable_parallel_processing,
         batch_size=doc_parser_batch_size,  # Process N paragraphs in parallel per batch
         apply_post_processing=True,  # Enable post-processing
-        enable_translation=enable_translation  # Pass translation flag
+        translation_batch_size=translator_batch_size  # Process N paragraphs in parallel for translation
     )
     print("\n" + "=" * 70)
     print("📊 EXTRACTION RESULTS")

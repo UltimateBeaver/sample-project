@@ -66,6 +66,7 @@ Sample repo for master's degree thesis
     LLAMACPP_MODEL_CONTEXT_SIZE=32768
     LLAMACPP_EMBED_CONTEXT_SIZE=2048
     ### Langchain Output Parser: Provider-specific configurations
+    ### NOTE: the following configs act as a safeguard to prevent exceeding the maximum context window of the LLM provider. If you encounter errors related to context window limits, consider adjusting these values.
     # ProviderType.OPENAI
     PROVIDER_OPENAI_MAX_ELEMENTS_PER_BATCH=8
     PROVIDER_OPENAI_MAX_TOKENS_PER_BATCH=8192
@@ -103,7 +104,7 @@ Sample repo for master's degree thesis
     COLUMN_NAME_SENTIMENT=SENTIMENTO
     # Translation settings
     ENABLE_TRANSLATION=true
-    TRANSLATOR_BATCH_SIZE=2
+    TRANSLATOR_BATCH_SIZE=8
     # Polito HPC ssh settings
     HPC_USER=your-ssh-username
     HPC_HOST=hpc-legionlogin.polito.it
@@ -170,28 +171,37 @@ python main.py
 ---
 # Developer tips
 - When adding a new package, add the definition also in pyproject.toml
-- When changing models, please refer to [langchain_output_parser.py](./itext2kg_atom/itext2kg/llm_output_parsing/langchain_output_parser.py), updating PROVIDER_CONFIGS object. This is the default config for Ollama:
-```python
-ProviderType.OLLAMA: ProviderConfig(
-    name="Ollama",
-    max_elements_per_batch=32,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
-    max_tokens_per_batch=12000,   # Increased to 12K per request (local inference, not API limits)
-    max_context_window=32768,   # Ollama context window
-    max_pending_requests=None,   # Ollama doesn't have explicit pending request limits
-    sleep_between_batches=0.1,   # 100ms between batches to prevent GPU thrashing
-)
-```
-The following is the default config for llama.cpp:
-```python
-ProviderType.OPENAI: ProviderConfig(
-    name="llama.cpp (Local)",
-    max_elements_per_batch=8,    
-    max_tokens_per_batch=8192,   # Very conservative token limit
-    max_context_window=16384,    # Typical for local models
-    max_pending_requests=None,
-    #sleep_between_batches=0.1,   # Small delay between requests
-),
-```
+- A few words about the LangchainOutputParser: depending on the LLMprovider you choose to use, there are different PROVIDER_CONFIGS. Make sure to properly set the following environment variables, before editing anything else:
+    ```shell
+    PROVIDER_<PROVIDER_NAME>_MAX_ELEMENTS_PER_BATCH=8
+    PROVIDER_<PROVIDER_NAME>_MAX_TOKENS_PER_BATCH=8192
+    PROVIDER_<PROVIDER_NAME>_MAX_CONTEXT_WINDOW=16384
+    ```
+    <br> These vars acts as a safeguard to prevent exceeding the maximum context window of the LLM provider.
+    <br> The `$DOC_PARSER_BATCH_SIZE` and `$TRANSLATOR_BATCH_SIZE` env vars may also be greater than `$PROVIDER_<PROVIDER_NAME>_MAX_ELEMENTS_PER_BATCH`. That's because the safeguard does not apply only to the batch size, but also to the number of required token for the LLM query. See `LangchainOutputParser.count_tokens()` method.
+    <br> Refer to [langchain_output_parser.py](./itext2kg_atom/itext2kg/llm_output_parsing/langchain_output_parser.py) for more details.
+    <br> When changing models, please refer to, updating PROVIDER_CONFIGS object. This is the default config for Ollama:
+    ```python
+    ProviderType.OLLAMA: ProviderConfig(
+        name="Ollama",
+        max_elements_per_batch=32,    # Conservative for local GPU: smaller batches prevent OOM on 16GB VRAM
+        max_tokens_per_batch=12000,   # Increased to 12K per request (local inference, not API limits)
+        max_context_window=32768,   # Ollama context window
+        max_pending_requests=None,   # Ollama doesn't have explicit pending request limits
+        sleep_between_batches=0.1,   # 100ms between batches to prevent GPU thrashing
+    )
+    ```
+    The following is the default config for llama.cpp:
+    ```python
+    ProviderType.OPENAI: ProviderConfig(
+        name="llama.cpp (Local)",
+        max_elements_per_batch=8,    
+        max_tokens_per_batch=8192,   # Very conservative token limit
+        max_context_window=16384,    # Typical for local models
+        max_pending_requests=None,
+        #sleep_between_batches=0.1,   # Small delay between requests
+    ),
+    ```
 
 - If you encounter crashes or instability issues of llama.cpp model server, change the num-parallel parameter to `-np 1`. 
 <br>Processing multiple reasoning streams at the same time on a single local GPU heavily degrades individual latency. Running them sequentially is actually more practical because a single request gets 100% of your GPU's compute. -np 1 tells the engine to completely disable multi-slot context blending.
@@ -201,4 +211,4 @@ ProviderType.OPENAI: ProviderConfig(
 - [x] Self loop relationships without any sense
 - [x] Entities with empty names
 - [ ] Redundant relationships
-- [ ] Italian names are translated as well (ie: Mario Draghi becomes Mario Dragons)
+- [x] Italian names are translated as well (ie: Mario Draghi becomes Mario Dragons)

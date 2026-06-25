@@ -599,10 +599,11 @@ Return the extracted information strictly adhering to the requested format.
         try:
             
             # Create system queries for each paragraph (one per observation date)
-            system_queries = [
-                self._create_temporal_system_query(obs_date)
-                for obs_date in observation_dates
-            ]
+            # system_queries = [
+            #     self._create_temporal_system_query(obs_date)
+            #     for obs_date in observation_dates
+            # ]
+            system_query = self._create_temporal_system_query(observation_dates[0])  # Use first observation date for batch processing
             
             # Use LangchainOutputParser batch processing to extract facts from all paragraphs
             # This allows the underlying LLM provider to batch requests efficiently
@@ -612,7 +613,7 @@ Return the extracted information strictly adhering to the requested format.
             results = await self.parser.extract_information_as_json_for_context(
                 output_data_structure=AtomicFact,
                 contexts=paragraphs,
-                system_query=system_queries[0],  # Note: All dates are similar, so first query is representative
+                system_query=system_query,  # Note: All dates are similar, so first query is representative
                 json_schema_enabled=True
             )
             
@@ -655,7 +656,7 @@ Return the extracted information strictly adhering to the requested format.
         doc_parser_enable_parallel_processing: bool = True,
         batch_size: int = 2,
         apply_post_processing: bool = True,
-        enable_translation: bool = False
+        translation_batch_size: int = 2,
     ) -> pd.DataFrame:
         """
         Read an Excel file, extract atomic facts for each paragraph, and save results.
@@ -690,6 +691,7 @@ Return the extracted information strictly adhering to the requested format.
         sentiments = []
         if column_name_sentiment not in df.columns:
             logger.warning(f"Column '{column_name_sentiment}' not found in Excel. Sentiment analysis will be skipped.")
+            sentiments = None
         else:
             sentiments_str = df[column_name_sentiment].tolist()
             for s in sentiments_str:
@@ -706,7 +708,7 @@ Return the extracted information strictly adhering to the requested format.
             paragraphs = df[column_name_paragraph].tolist()
             logger.info(f"📝 Translating {len(paragraphs)} paragraphs from Italian to English...")
             try:
-                paragraphs_to_process = self.translator.translate_batch(paragraphs, sentiments, batch_size=8)
+                paragraphs_to_process = await self.translator.translate_batch(paragraphs, sentiments, batch_size=translation_batch_size)
                 logger.info(f"✅ Translation completed for {len(paragraphs_to_process)} paragraphs")
 
                 # Add a new column for translated paragraphs
