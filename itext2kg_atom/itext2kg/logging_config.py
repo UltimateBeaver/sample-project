@@ -5,6 +5,15 @@ from typing import Optional
 
 import langchain
 
+import warnings
+# Suppress LangChain's specific warning about structured output streaming when using ChatOpenAI with Pydantic response_format and 'json_schema' output parser.
+warnings.filterwarnings(
+    "ignore",
+    message="Streaming with Pydantic response_format not yet supported.",
+    category=UserWarning,
+    module="langchain_openai.chat_models.base"
+)
+
 
 def setup_logging(
     level: str = "INFO",

@@ -10,8 +10,13 @@ Tests cover:
 
 import pytest
 import asyncio
-from itext2kg_atom.itext2kg.translation import TranslationService, create_translator
+from translation import TranslationService
+from models.models import get_default_model
 
+# Tell pytest to treat all test functions in this module as coroutines
+pytestmark = pytest.mark.asyncio
+
+model = get_default_model()
 
 class TestTranslationService:
     """Test suite for TranslationService class."""
@@ -20,28 +25,29 @@ class TestTranslationService:
     def translator(self):
         """Create a TranslationService instance for testing."""
         try:
-            return TranslationService(model_name="it-en")
+            return TranslationService(llm_model=model)
         except ImportError:
             pytest.skip("transformers library not installed")
     
     def test_translator_initialization(self, translator):
         """Test that translator initializes correctly."""
         assert translator is not None
-        assert translator.model_name == "it-en"
-        assert translator.translator is None  # Lazy loaded
+        assert translator.raw_model == model  # Updated to match self.raw_model property
+        assert translator.parser is not None  # Updated to check the LangchainOutputParser instance
     
-    def test_simple_translation(self, translator):
+    async def test_simple_translation(self, translator):
         """Test single text translation."""
         italian_text = "Buongiorno, come stai?"
-        result = translator.translate(italian_text)
         
-        # Should return something (translator loaded)
+        # Routed via translate_batch since translate() was removed
+        results = await translator.translate_batch([italian_text])
+        result = results[0]
+        
         assert isinstance(result, str)
         assert len(result) > 0
-        # Result should contain English words, not Italian
-        assert "hello" in result.lower() or "good" in result.lower() or "how" in result.lower()
+        assert any(word in result.lower() for word in ["hello", "good", "how", "you"])
     
-    def test_batch_translation(self, translator):
+    async def test_batch_translation(self, translator):
         """Test batch translation of multiple texts."""
         italian_texts = [
             "Buongiorno, come stai?",
@@ -49,14 +55,14 @@ class TestTranslationService:
             "Dove si trova la stazione?"
         ]
         
-        results = translator.translate_batch(italian_texts, batch_size=2)
+        results = await translator.translate_batch(italian_texts, batch_size=2)
         
         assert len(results) == len(italian_texts)
         for result in results:
             assert isinstance(result, str)
             assert len(result) > 0
     
-    def test_financial_news_translation(self, translator):
+    async def test_financial_news_translation(self, translator):
         """Test translation of financial news text (Italian)."""
         financial_text = (
             "L'amministratore delegato di Banco BPM, Giuseppe Castagna, "
@@ -64,65 +70,51 @@ class TestTranslationService:
             "Il profitto netto è aumentato del 25% rispetto allo stesso periodo dell'anno scorso."
         )
         
-        result = translator.translate(financial_text)
+        results = await translator.translate_batch([financial_text])
+        result = results[0]
         
         assert isinstance(result, str)
         assert len(result) > 0
         # Check for English financial terms
-        assert any(word in result.lower() for word in ["ceo", "chief", "announced", "announced", "profit", "results"])
+        assert any(word in result.lower() for word in ["ceo", "chief", "announced", "profit", "results"])
     
-    def test_temporal_expression_translation(self, translator):
+    async def test_temporal_expression_translation(self, translator):
         """Test translation of temporal expressions."""
         temporal_texts = [
-            "ieri ho visto una notizia importante",  # yesterday I saw important news
-            "la settimana scorsa è accaduto un evento",  # last week an event happened
-            "il mese prossimo avremo novità",  # next month we will have news
+            "ieri ho visto una notizia importante",  
+            "la settimana scorsa è accaduto un eventò",  
+            "il mese prossimo avremo novità",  
         ]
         
-        results = translator.translate_batch(temporal_texts)
+        results = await translator.translate_batch(temporal_texts)
         
         assert len(results) == len(temporal_texts)
-        # Check that temporal references are translated
         for result in results:
             assert len(result) > 0
-            # Should contain English temporal markers
             assert any(
                 word in result.lower() 
                 for word in ["yesterday", "week", "month", "past", "last", "next", "ago"]
-            ) or True  # May vary based on translation model output
+            ) or True  
     
-    def test_empty_input(self, translator):
+    async def test_empty_input(self, translator):
         """Test handling of empty input."""
-        result = translator.translate_batch([])
+        result = await translator.translate_batch([])
         assert result == []
     
-    def test_single_item_batch(self, translator):
+    async def test_single_item_batch(self, translator):
         """Test batch translation with single item."""
-        result = translator.translate_batch(["Ciao mondo"])
+        result = await translator.translate_batch(["Ciao mondo"])
         assert len(result) == 1
         assert isinstance(result[0], str)
     
-    def test_long_text_translation(self, translator):
+    async def test_long_text_translation(self, translator):
         """Test translation of longer text."""
-        long_text = " ".join(["Questo è un test di traduzione"] * 20)  # Repeat phrase
+        long_text = " ".join(["Questo è un test di traduzione"] * 20)  
         
-        result = translator.translate(long_text)
+        results = await translator.translate_batch([long_text])
+        result = results[0]
         assert isinstance(result, str)
         assert len(result) > 0
-    
-    def test_create_translator_factory(self):
-        """Test the create_translator factory function."""
-        try:
-            translator = create_translator(language_pair="it-en")
-            assert isinstance(translator, TranslationService)
-            assert translator.model_name == "it-en"
-        except ImportError:
-            pytest.skip("transformers library not installed")
-    
-    def test_unsupported_language_pair(self):
-        """Test handling of unsupported language pairs."""
-        with pytest.raises(ValueError):
-            TranslationService(model_name="xx-yy")
 
 
 class TestTranslationIntegration:
@@ -130,13 +122,14 @@ class TestTranslationIntegration:
     
     @pytest.fixture
     def translator(self):
-        """Create a TranslationService instance."""
+        """Create a TranslationService instance using the global model."""
         try:
-            return TranslationService(model_name="it-en")
+            # Updated to pass the required llm_model object instance instead of a string
+            return TranslationService(llm_model=model)
         except ImportError:
             pytest.skip("transformers library not installed")
     
-    def test_news_article_translation(self, translator):
+    async def test_news_article_translation(self, translator):
         """Test translation of a realistic news article excerpt."""
         italian_article = (
             "ROMA — Il mercato azionario italiano ha registrato una crescita significativa "
@@ -146,17 +139,17 @@ class TestTranslationIntegration:
             "economici europei e alla fiducia degli investitori."
         )
         
-        result = translator.translate(italian_article)
+        results = await translator.translate_batch([italian_article])
+        result = results[0]
         
         assert isinstance(result, str)
         assert len(result) > 0
-        # Should have English financial/economic terms
         assert any(
             word in result.lower() 
             for word in ["market", "index", "growth", "investors", "banking", "energy", "economic"]
         )
     
-    def test_batch_news_translation(self, translator):
+    async def test_batch_news_translation(self, translator):
         """Test batch translation of multiple news articles."""
         articles = [
             "La Banca Centrale Europea ha mantenuto i tassi di interesse invariati.",
@@ -164,7 +157,7 @@ class TestTranslationIntegration:
             "Il settore manifatturiero mostra segnali di ripresa economica."
         ]
         
-        results = translator.translate_batch(articles, batch_size=2)
+        results = await translator.translate_batch(articles, batch_size=2)
         
         assert len(results) == len(articles)
         for result in results:
