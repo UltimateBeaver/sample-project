@@ -131,11 +131,22 @@ class TranslationService:
         # Alternative implementation: single-prompt translation with sentiment and terminology checks
         prompt = f"""
 You are an expert translator specializing in Italian-to-English financial news.
-You will be provided with Italian texts, each one labelled with a **Sentiment** value (general linguistic tone) on a scale from 1 to 5, with increments of 0.5.
+You will be provided with Italian news texts.
+
+Your task is to translate the following Italian text into English and provide a honest sentiment assessment of the translation. 
+
+Follow these strict guidelines for the translation:
+- During the translation, try to maintain the exact financial sentiment, nuance, and market tone (bearish/bullish).
+- CRITICAL: Surnames, proper nouns, and corporate brand names must never be translated literally.
+- Ensure accurate and technical financial terminology matching standard English economic reporting.
+- After translating, make a honest assessment of your translation, providing a sentiment value on the same 1 to 5 scale.
+
+Follow this guide to compute the sentiment value of the translated text:
+The **sentiment** value represents the general linguistic tone, on a scale from 1 to 5, with increments of 0.5.
 
 **REFERENCE SCALE:**
 - 1 = very negative
-- 2 = negative  
+- 2 = negative
 - 3 = neutral
 - 4 = positive
 - 5 = very positive
@@ -146,19 +157,10 @@ You will be provided with Italian texts, each one labelled with a **Sentiment** 
 - 3.5 = between neutral and positive
 - 4.5 = between positive and very positive
 
-Your task is to translate the following Italian text into English and provide a honest sentiment assessment of the translation. Follow these strict guidelines:
-- During the translation, try to maintain the exact financial sentiment, nuance, and market tone (bearish/bullish).
-- CRITICAL: Surnames, proper nouns, and corporate brand names must never be translated literally.
-- Ensure accurate and technical financial terminology matching standard English economic reporting.
-- After translating, make a honest assessment of your translation, providing a sentiment value on the same 1 to 5 scale.
-
 Return the extracted information strictly adhering to the requested format.
 """
 
-        input_context = [
-            f"Sentiment value: {sent}\nItalian text:\n{tx}" 
-            for tx, sent in zip(texts, sentiments)
-        ]
+        input_context = texts
 
         response = await self.parser.extract_information_as_json_for_context(
             output_data_structure=TranslationResult,
@@ -219,9 +221,10 @@ Return the extracted information strictly adhering to the requested format.
 
 
 
-    async def translate_batch(self, paragraphs: List[str], sentiments: List[float] = None, batch_size: int = 1) -> List[str]:
+    async def translate_batch(self, paragraphs: List[str], sentiments: List[float] = None, batch_size: int = 1) -> Tuple[List[str], List[float]]:
         """Processes the texts sequentially or in small steps."""
         translated_texts = []
+        sentiment_translated_batch = None
         total = len(paragraphs)
 
         if sentiments and len(paragraphs) != len(sentiments):
@@ -243,7 +246,7 @@ Return the extracted information strictly adhering to the requested format.
                 logger.error(f"Error translating batch {i//batch_size + 1}: {e}")
                 translated_texts.extend(batch_texts) # Fallback to original texts on failure
 
-        return translated_texts
+        return translated_texts, sentiment_translated_batch
     
     async def translate_with_metadata(
             self, paragraphs: List[str], observation_dates: List[str], batch_size: int = 1

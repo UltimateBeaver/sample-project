@@ -46,6 +46,7 @@ import asyncio
 import logging
 from itext2kg_atom.itext2kg.logging_config import get_logger
 import re
+from math import sqrt
 from pathlib import Path
 from typing import List, Optional, Tuple
 from datetime import datetime, timedelta
@@ -708,12 +709,18 @@ Return the extracted information strictly adhering to the requested format.
             paragraphs = df[column_name_paragraph].tolist()
             logger.info(f"📝 Translating {len(paragraphs)} paragraphs from Italian to English...")
             try:
-                paragraphs_to_process = await self.translator.translate_batch(paragraphs, sentiments, batch_size=translation_batch_size)
+                paragraphs_to_process, sentiments_translated = await self.translator.translate_batch(paragraphs, sentiments, batch_size=translation_batch_size)
                 logger.info(f"✅ Translation completed for {len(paragraphs_to_process)} paragraphs")
 
                 # Add a new column for translated paragraphs
                 df['translated_paragraph'] = paragraphs_to_process
                 column_name_paragraph = 'translated_paragraph'  # Update to use translated paragraphs for processing
+                # If not None, add a new column for translated sentiments and compute translation metrics
+                if sentiments_str is not None:
+                    df['translated_sentiment'] = sentiments_translated
+                    sentiments_original = df[column_name_sentiment].tolist()
+                    # Compute sentiment metrics
+                    self.compute_translation_sentiment_metrics(sentiments_original, sentiments_translated)
             except Exception as e:
                 logger.error(f"Translation failed: {e}. Using original paragraphs.")
 
@@ -861,6 +868,32 @@ Return the extracted information strictly adhering to the requested format.
         except Exception as e:
             logger.error(f"Error processing batch {batch_num}: {e}")
             return [(idx, []) for idx in batch_row_indices]
+
+    def compute_translation_sentiment_metrics(self, original_sentiments: List[float], translated_sentiments: List[float]):
+        if len(original_sentiments) <= 0 or len(translated_sentiments) <= 0:
+            logger.error("Could not compute sentiment metrics on empty lists")
+        if len(original_sentiments) != len(translated_sentiments):
+            logger.error("Could not compute sentiment metrics lists with different size")
+        # original_sentiments = [1.0, 1.0, 2.0, 3.0, 2.0, 1.0, 4.0, 3.0, 3.0, 1.0]
+        # translated_sentiments = [3.0, 1.5, 1.0, 3.5, 1.5, 1.0, 4.0, 3.5, 2.5, 1.0]
+        avg_original = sum(original_sentiments) / len(original_sentiments)
+        avg_translated = sum(translated_sentiments) / len(translated_sentiments)
+
+        # Mean Absolute Error (MAE): calculates the average absolute distance between the original and translated sentiments. 
+        # It tells you, on average, how many points off your LLM's translated sentiment is.
+        MAE = sum([abs(a - b) for (a, b) in zip(original_sentiments, translated_sentiments)]) / len(original_sentiments)
+        # Root Mean Squared Error (RMSE): penalizes larger errors much more harshly than smaller ones
+        RMSE = sqrt(sum([pow(abs(a - b), 2) for (a, b) in zip(original_sentiments, translated_sentiments)])) / len(original_sentiments)
+        # Pearson Correlation coefficient: A score close to 1 means the LLM preserves the relative sentiment scaling perfectly, 
+        # even if its baseline is slightly shifted (e.g., if it consistently rates everything 0.5 higher than the original)
+        r = sum([(a - avg_original) * (b - avg_translated) for (a, b) in zip(original_sentiments, translated_sentiments)]) / sqrt(sum([pow(a - avg_original, 2) for a in original_sentiments]) * sum([pow(b - avg_translated, 2) for b in translated_sentiments]))
+        
+        logger.info(f"Computed metrics for Sentiment analysis:")
+        logger.info(f"> Mean Absolute Error (MAE) = {MAE}. On average, the translation alters the sentiment by ±{MAE}")
+        logger.info(f"> Root Mean Squared Error (RMSE) = {RMSE}. This metric penalizes larger errors with higher severity than MAE")
+        logger.info(f"> Pearson Correlation coefficient r = {r}. A score close to 1 means the LLM preserves the relative sentiment scaling perfectly, even if its baseline is slightly shifted")
+
+
 
 
 # ============================================================================
