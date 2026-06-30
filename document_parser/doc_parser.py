@@ -687,24 +687,26 @@ Return the extracted information strictly adhering to the requested format.
         # Validate required columns
         if column_name_date not in df.columns or column_name_paragraph not in df.columns:
             raise ValueError(f"Excel file must contain '{column_name_date}' and '{column_name_paragraph}' columns")
-        
-        # Validate optional columns
-        sentiments = []
-        if column_name_sentiment not in df.columns:
-            logger.warning(f"Column '{column_name_sentiment}' not found in Excel. Sentiment analysis will be skipped.")
-            sentiments = None
-        else:
-            sentiments_str = df[column_name_sentiment].tolist()
-            for s in sentiments_str:
-                extracted_float = float(match.group(1)) if(match := re.search(r'^(\d+\.?\d*)', s)) else None
-                if extracted_float is not None:
-                    sentiments.append(extracted_float)
-                else:
-                    logger.error(f"Could not extract float from sentiment value '{s}'. Defaulting to 3.0")
-                    sentiments.append(3.0)
 
-        # Update language settings if provided
+
         if self.enable_translation:
+            # Validate optional sentiment column
+            sentiments = []
+            sentiments_str = None
+            if column_name_sentiment not in df.columns:
+                logger.warning(f"Column '{column_name_sentiment}' not found in Excel. Sentiment analysis will be skipped.")
+                sentiments = None
+            else:
+                sentiments_str = df[column_name_sentiment].tolist()
+                for s in sentiments_str:
+                    extracted_float = float(match.group(1)) if(match := re.search(r'^(\d+\.?\d*)', s)) else None
+                    if extracted_float is not None:
+                        sentiments.append(extracted_float)
+                    else:
+                        logger.error(f"Could not extract float from sentiment value '{s}'. Defaulting to 3.0")
+                        sentiments.append(3.0)
+                df["sentiment_float"] = sentiments
+
             # Translate the dataset
             paragraphs = df[column_name_paragraph].tolist()
             logger.info(f"📝 Translating {len(paragraphs)} paragraphs from Italian to English...")
@@ -718,9 +720,8 @@ Return the extracted information strictly adhering to the requested format.
                 # If not None, add a new column for translated sentiments and compute translation metrics
                 if sentiments_str is not None:
                     df['translated_sentiment'] = sentiments_translated
-                    sentiments_original = df[column_name_sentiment].tolist()
                     # Compute sentiment metrics
-                    self.compute_translation_sentiment_metrics(sentiments_original, sentiments_translated)
+                    self.compute_translation_sentiment_metrics(sentiments, sentiments_translated)
             except Exception as e:
                 logger.error(f"Translation failed: {e}. Using original paragraphs.")
 
@@ -889,7 +890,8 @@ Return the extracted information strictly adhering to the requested format.
         r = sum([(a - avg_original) * (b - avg_translated) for (a, b) in zip(original_sentiments, translated_sentiments)]) / sqrt(sum([pow(a - avg_original, 2) for a in original_sentiments]) * sum([pow(b - avg_translated, 2) for b in translated_sentiments]))
         
         logger.info(f"Computed metrics for Sentiment analysis:")
-        logger.info(f"> Mean Absolute Error (MAE) = {MAE}. On average, the translation alters the sentiment by ±{MAE}")
+        logger.info(f"> Total sentiments analyzed: {len(original_sentiments)}")
+        logger.info(f"> Mean Absolute Error (MAE) = {MAE}. On average, the translation alters the sentiment by ± {MAE}")
         logger.info(f"> Root Mean Squared Error (RMSE) = {RMSE}. This metric penalizes larger errors with higher severity than MAE")
         logger.info(f"> Pearson Correlation coefficient r = {r}. A score close to 1 means the LLM preserves the relative sentiment scaling perfectly, even if its baseline is slightly shifted")
 
