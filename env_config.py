@@ -35,5 +35,6 @@ column_name_sentiment =                     os.getenv("COLUMN_NAME_SENTIMENT", "
 
 # Language configuration
 enable_translation =                        os.getenv("ENABLE_TRANSLATION", "false").lower() == "true"  # Auto-translate if not English
+enable_translator_few_shot =                os.getenv("ENABLE_TRANSLATOR_FEW_SHOT", "false").lower() == "true"  # Whether to use few shot examples for sentiment evaluation or not
 translator_batch_size =                     int(os.getenv("TRANSLATOR_BATCH_SIZE", 2))                  # Batch size for translation
 translator_few_shot_seed =                  os.getenv("TRANSLATOR_FEW_SHOT_SEED", 42)                   # Seed for extracting random 5 samples for few shot sentiment context

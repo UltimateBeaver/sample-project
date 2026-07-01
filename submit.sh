@@ -4,8 +4,8 @@
 #SBATCH --ntasks=1                    # 1 main task execution
 #SBATCH --cpus-per-task=4             # Request 4 CPU cores for data processing
 #SBATCH --mem=32GB                    # Request 32 GB system memory
-#SBATCH --gres=gpu:1                  # Request 1 GPU (Required for Gemma 4)
-#SBATCH --time=0-02:00:00             # Max runtime (Hours: 2 hours)
+#SBATCH --gres=gpu:2                  # Request 2 GPU (Required for Gemma 4)
+#SBATCH --time=0-20:00:00             # Max runtime (Hours: 20 hours)
 #SBATCH --partition=gpu_a40           # GPU partition on the cluster
 #SBATCH --output=logs/thesis_job_stdout_%j.log    # Standard output log file
 #SBATCH --error=logs/thesis_job_stderr_%j.log     # Standard error log file

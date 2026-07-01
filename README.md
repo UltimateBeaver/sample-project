@@ -104,6 +104,7 @@ Sample repo for master's degree thesis
     COLUMN_NAME_SENTIMENT=SENTIMENTO
     # Translation settings
     ENABLE_TRANSLATION=true
+    ENABLE_TRANSLATOR_FEW_SHOT=true
     TRANSLATOR_BATCH_SIZE=8
     # Polito HPC ssh settings
     HPC_USER=your-ssh-username

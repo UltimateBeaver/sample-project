@@ -13,9 +13,10 @@ from functools import lru_cache
 from pydantic import BaseModel, Field
 import torch
 
+from .translator_prompt import TranslatorPrompt
 from itext2kg_atom.itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg_atom.itext2kg.logging_config import get_logger
-from env_config import translator_few_shot_seed, doc_parser_input_excel_path, column_name_paragraph, column_name_sentiment
+from env_config import translator_few_shot_seed, doc_parser_input_excel_path, column_name_paragraph, column_name_sentiment, enable_translator_few_shot
 
 logger = get_logger(__name__)
 
@@ -109,25 +110,6 @@ class TranslationService:
             f"(device: {self.device})"
         )
     
-#     def _translate_single_texts(self, text: str) -> str:
-#         """Translates a single piece of text using an initial translation -> critique -> refine loop."""
-
-#         # Alternative implementation: single-prompt translation with reflection
-#         prompt = (
-#             "You are an expert translator specializing in Italian-to-English financial news.\n"
-#             "Translate the following Italian text into English. Follow these strict guidelines:\n"
-#             "- Maintain the exact financial sentiment, nuance, and market tone (bearish/bullish).\n"
-#             "- CRITICAL: Surnames, proper nouns, and corporate brand names must never be translated literally.\n"
-#             "- Ensure accurate and technical financial terminology matching standard English economic reporting.\n\n"
-#             f"Italian Text:\n{text}\n\n"
-#             "Final English Translation (Output only the translated text, nothing else):"
-#         )
-
-#         response = self.raw_model.invoke(prompt)
-#         final_translation = response.content.strip() if hasattr(response, 'content') else str(response).strip()
-
-#         return final_translation
-
     # This method must only be called by __init__ to prevent file locks during batching
     def _get_few_shot_examples(self) -> Tuple[List[str], List[float]]:
         FILE_PATH = f"./data/translator_seeds/{translator_few_shot_seed}.xlsx"
@@ -186,50 +168,23 @@ class TranslationService:
 
 
     async def _translate_multiple_texts(self, texts: List[str], sentiments: List[float]) -> Tuple[List[str], List[float]]:
-        """Translates multiple texts through batch processing, using a single prompt with sentiment and terminology checks."""
+        """Translates multiple texts through batch processing, using a single prompt with sentiment and terminology checks.
+            Args:
+                texts: a list of paragraphs to translate
+                sentiments: a list of sentiments float values of the paragraphs to translate
+        """
         
         # Alternative implementation: single-prompt translation with sentiment and terminology checks
-        prompt = f"""
-You are an expert translator specializing in Italian-to-English financial news.
-You will be provided with Italian news texts.
-
-Your task is to translate the following Italian text into English and provide a honest sentiment assessment of the translation. 
-
-Follow these strict guidelines for the translation:
-- During the translation, try to maintain the exact financial sentiment, nuance, and market tone (bearish/bullish).
-- CRITICAL: Surnames, proper nouns, and corporate brand names must never be translated literally.
-- Ensure accurate and technical financial terminology matching standard English economic reporting.
-- After translating, make a honest assessment of your translation, providing a sentiment value on the same 1 to 5 scale.
-
-Follow this guide to compute the sentiment value of the translated text:
-The **sentiment** value represents the general linguistic tone, on a scale from 1 to 5, with increments of 0.5.
-
-**REFERENCE SCALE:**
-- 1 = very negative
-- 2 = negative
-- 3 = neutral
-- 4 = positive
-- 5 = very positive
-
-**Intermediate values (1.5, 2.5, 3.5, 4.5) are nuances between two adjacent categories:**
-- 1.5 = between very negative and negative
-- 2.5 = between negative and neutral
-- 3.5 = between neutral and positive
-- 4.5 = between positive and very positive
-
-Return the extracted information strictly adhering to the requested format.
-"""
-        few_shot_examples = f"""
-Below, you can find some examples of Italian texts, each one labelled with the correct **sentiment** value, provided with a human annotator:
-{[f"[translation: \"{text}\", sentiment={sentiment}]" for (text, sentiment) in zip(self.few_shot_paragraphs, self.few_shot_sentiments)]}
-"""
-
+        if enable_translator_few_shot:
+            system_query = TranslatorPrompt.translator_sentiment_query() + TranslatorPrompt.few_shot_query(self.few_shot_paragraphs, self.few_shot_sentiments)
+        else:
+            system_query = TranslatorPrompt.translator_sentiment_query()
         input_context = texts
 
         response = await self.parser.extract_information_as_json_for_context(
             output_data_structure=TranslationResult,
             contexts=input_context,
-            system_query=prompt + few_shot_examples,
+            system_query=system_query,
             json_schema_enabled=True
         )
 
@@ -252,25 +207,13 @@ Below, you can find some examples of Italian texts, each one labelled with the c
         """Translates multiple texts through batch processing, using a single prompt with sentiment and terminology checks."""
         
         # Alternative implementation: single-prompt translation with sentiment and terminology checks
-        prompt = f"""
-You are an expert translator specializing in Italian-to-English financial news.
-You will be provided with Italian texts.
-
-Your task is to translate the following Italian text into English and provide a honest sentiment assessment of the translation. Follow these strict guidelines:
-- During the translation, try to maintain the exact financial sentiment, nuance, and market tone (bearish/bullish).
-- CRITICAL: Surnames, proper nouns, and corporate brand names must never be translated literally.
-- Ensure accurate and technical financial terminology matching standard English economic reporting.
-- After translating, make a honest assessment of your translation, providing a sentiment value on the same 1 to 5 scale.
-
-Return the extracted information strictly adhering to the requested format.
-"""
-
+        system_query = TranslatorPrompt.translator_no_sentiment_query()
         input_context = texts
 
         response = await self.parser.extract_information_as_json_for_context(
             output_data_structure=TranslationResultNoSentiment,
             contexts=input_context,
-            system_query=prompt,
+            system_query=system_query,
             json_schema_enabled=True
         )
 

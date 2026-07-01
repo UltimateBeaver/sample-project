@@ -209,6 +209,10 @@ __marimo__/
 
 # Additional gitignore settings
 /ignore
+/data/*.xlsx
+/data/translator_seeds/*.xlsx
+/data/knowledge_graphs/*
+/data/*.pkl
 /docker
 /neo4j
 neo4j.sif
