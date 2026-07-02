@@ -134,7 +134,7 @@ Sample repo for master's degree thesis
     # Remove everything (including volumes)
     docker compose down -v
     ```
-4. LLM and embedding model infrastructure:
+4. LLM and embedding model infrastructure (for `models_config.py` configuration details refer to [CONFIGURATION_GUIDE.md](./docs/1_CONFIGURATION_GUIDE.md)):
 * If you use Ollama, as default settings in models/models.py, download the required models:
     ```bash
     # Default llm model

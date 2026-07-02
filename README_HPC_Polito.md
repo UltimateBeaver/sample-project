@@ -121,7 +121,7 @@ In this guide there will be several steps in which you are required to copy-past
     # Pull the official Neo4j Docker image and convert it into an Apptainer image file (.sif)
     apptainer pull neo4j.sif docker://neo4j:latest
     ```
-4. LLM and embedding model infrastructure:
+4. LLM and embedding model infrastructure (for `models_config.py` configuration details refer to [CONFIGURATION_GUIDE.md](./docs/1_CONFIGURATION_GUIDE.md)):
 * If you use Ollama, as default settings in models/models.py, download the required models:
     ```bash
     # Install Ollama
