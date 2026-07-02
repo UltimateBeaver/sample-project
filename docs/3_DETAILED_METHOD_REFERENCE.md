@@ -6,12 +6,15 @@
 
 #### Constructor
 ```python
-def __init__(self, llm_model, embeddings_model) -> None
+def __init__(self, llm_model, embeddings_model) -> None:
+    """
+    Initialize ATOM pipeline components.
+    
     Attributes:
     - self.matcher: GraphMatcher()
     - self.llm_output_parser: LangchainOutputParser(llm_model, embeddings_model)
+    """
 ```
-**Line**: L14-22
 
 ---
 
@@ -24,7 +27,6 @@ async def extract_quintuples(
 ) -> List[RelationshipsExtractor]
 ```
 **Purpose**: Extract temporal relationships (quintuples) from atomic facts  
-**Line**: L52-56  
 **Returns**: List of RelationshipsExtractor objects with relationships containing t_start, t_end  
 **Dependencies**: LangchainOutputParser.extract_information_as_json_for_context()
 
@@ -43,7 +45,6 @@ async def build_atomic_kg_from_quintuples(
 ) -> KnowledgeGraph
 ```
 **Purpose**: Converts quintuples (relationships with temporal info) into atomic KnowledgeGraphs  
-**Line**: L88-127  
 **Process**:
 1. Create temporary KG with all entities
 2. Embed entities (weighted by name and label)
@@ -71,7 +72,6 @@ def merge_two_kgs(
 ) -> KnowledgeGraph
 ```
 **Purpose**: Merges two KGs using matcher logic  
-**Line**: L60-66  
 **Returns**: Single merged KnowledgeGraph  
 **Uses**: `self.matcher.match_entities_and_update_relationships()`
 
@@ -89,7 +89,6 @@ def parallel_atomic_merge(
 ) -> KnowledgeGraph
 ```
 **Purpose**: Merges multiple KGs in parallel using tree reduction  
-**Line**: L68-86  
 **Algorithm**: 
 - Pairs KGs and merges them in parallel
 - Repeats until single KG remains
@@ -115,7 +114,6 @@ async def build_graph(
 ) -> KnowledgeGraph
 ```
 **Purpose**: Main method - builds temporal KG from atomic facts at one timestamp  
-**Line**: L131-161  
 **Process**:
 1. Extract quintuples from all atomic facts
 2. Build atomic KGs from quintuples
@@ -143,7 +141,7 @@ async def build_graph_from_different_obs_times(
 ) -> KnowledgeGraph
 ```
 **Purpose**: Builds temporal KG across multiple observation timestamps  
-**Line**: L163-+  
+-+  
 **Input Format**: `{timestamp: [atomic_facts], ...}`  
 **Process**:
 1. For each timestamp, call `build_graph()`
@@ -158,8 +156,6 @@ async def build_graph_from_different_obs_times(
 ```python
 def __init__(self) -> None
 ```
-**Line**: L18
-
 ---
 
 #### Method: `_batch_match_entities()`
@@ -172,7 +168,6 @@ def _batch_match_entities(
 ) -> Tuple[List[Entity], List[Entity]]
 ```
 **Purpose**: Batch-matches entities from entities1 against entities2  
-**Line**: L25-89  
 **Algorithm**:
 1. **Exact matching**: Check `e1 in entities2` (uses __eq__)
 2. **Embedding matching**: 
@@ -199,7 +194,6 @@ def _batch_match_relationships(
 ) -> List[Relationship]
 ```
 **Purpose**: Matches relationships by name embeddings  
-**Line**: L94-150+  
 **Algorithm**:
 1. Extract name embeddings from both lists
 2. Compute cosine similarity matrix
@@ -227,7 +221,6 @@ def match_entities_and_update_relationships(
 ) -> Tuple[List[Entity], List[Relationship]]
 ```
 **Purpose**: Comprehensive match of entities and relationships across two KGs  
-**Line**: (interface definition)  
 **Process**:
 1. Match entities from set 1 against set 2
 2. Match relationships from set 1 against set 2
@@ -255,7 +248,6 @@ def __init__(
 ) -> None
 ```
 **Purpose**: Initialize with LLM and embeddings models  
-**Line**: L12-24  
 **Attributes**:
 - `self.ientities_extractor`: iEntitiesExtractor(...)
 - `self.irelations_extractor`: iRelationsExtractor(...)
@@ -280,7 +272,6 @@ async def build_graph(
 ) -> KnowledgeGraph
 ```
 **Purpose**: Builds KG from multiple document sections  
-**Line**: L33-107  
 **Process**:
 1. Extract entities from section 0
 2. Extract and verify relationships for section 0
@@ -311,7 +302,6 @@ def __init__(
 ) -> None
 ```
 **Purpose**: Initialize entity extractor  
-**Line**: L10-17  
 **Attributes**:
 - `self.langchain_output_parser`: LangchainOutputParser(...)
 
@@ -328,7 +318,6 @@ async def extract_entities(
 ) -> List[Entity]
 ```
 **Purpose**: Extracts entities from text with embeddings  
-**Line**: L24-83  
 **Process**:
 1. Call LLM with context to extract entities as JSON
 2. Parse result to EntitiesExtractor.entities
@@ -355,7 +344,6 @@ def __init__(
 ) -> None
 ```
 **Purpose**: Initialize relationship extractor  
-**Line**: L10-19  
 **Attributes**:
 - `self.langchain_output_parser`: LangchainOutputParser(...)
 - `self.matcher`: Matcher()
@@ -375,7 +363,6 @@ async def extract_relations(
 ) -> List[Relationship]
 ```
 **Purpose**: Extracts relationships from context, handles invented entities  
-**Line**: L30-107  
 **Process**:
 1. Format context with simplified entity list
 2. Call LLM to extract relationships
@@ -407,7 +394,6 @@ async def extract_verify_and_correct_relations(
 ) -> List[Relationship]
 ```
 **Purpose**: Main method - extracts, verifies, and corrects relationships  
-**Line**: L109-166  
 **Process**:
 1. Call `extract_relations()`
 2. Find isolated entities (entities without relationships)
@@ -430,8 +416,6 @@ async def extract_verify_and_correct_relations(
 ```python
 def __init__(self) -> None
 ```
-**Line**: L13
-
 ---
 
 #### Method: `find_match()`
@@ -444,7 +428,6 @@ def find_match(
 ) -> Union[Entity, Relationship]
 ```
 **Purpose**: Finds best match for an entity or relationship  
-**Line**: L25-62  
 **Algorithm**:
 1. Extract name and embeddings from obj1
 2. For each obj2 in list_objects:
@@ -471,7 +454,6 @@ def process_lists(
 ) -> Tuple[List[Union[Entity, Relationship]], List[Union[Entity, Relationship]]]
 ```
 **Purpose**: Processes two lists to generate matched items and union  
-**Line**: L92-110  
 **Process**:
 1. For each item in list1, find best match in list2 → list3
 2. Create union of list3 + list2 → list4
@@ -492,7 +474,6 @@ def create_union_list(
 ) -> List[Union[Entity, Relationship]]
 ```
 **Purpose**: Creates union avoiding duplicates  
-**Line**: L65-91  
 **Duplicate Detection**:
 - **Entities**: By (name, label) tuple
 - **Relationships**: By name only
@@ -514,7 +495,6 @@ def match_entities_and_update_relationships(
 ) -> Tuple[List[Entity], List[Relationship]]
 ```
 **Purpose**: Matches entities and updates relationships  
-**Line**: L112-157+  
 **Process**:
 1. Match entities from set 1 against set 2
 2. Match relationships from set 1 against set 2
@@ -535,7 +515,6 @@ def match_entities_and_update_relationships(
 def __init__(self, llm_model) -> None
 ```
 **Purpose**: Initialize with LLM model  
-**Line**: L16-21  
 **Attributes**:
 - `self.langchain_output_parser`: LangchainOutputParser(...)
 
@@ -551,7 +530,6 @@ async def distill(
 ) -> Union[dict, BaseModel]
 ```
 **Purpose**: Distills and combines information from multiple documents  
-**Line**: L139-161  
 **Process**:
 1. Batch extract structured info from all documents
 2. Call `extract_information_as_json_for_context()` for all documents
@@ -571,7 +549,6 @@ def __combine_objects(
 ) -> Union[dict, BaseModel]
 ```
 **Purpose**: Combines list of objects (dicts or Pydantic models)  
-**Line**: L27-48  
 **Logic**: 
 - If all are same Pydantic type → use `__combine_pydantic_objects()`
 - Otherwise → use `__combine_via_dicts()`
@@ -587,7 +564,6 @@ def __combine_pydantic_objects(
 ) -> BaseModel
 ```
 **Purpose**: Combines Pydantic objects of same type  
-**Line**: L50-95  
 **Process**:
 1. Extract all field names from objects
 2. For each field:
@@ -603,7 +579,6 @@ def __combine_pydantic_objects(
 def __merge_field_values(values: List[Any]) -> Any
 ```
 **Purpose**: Merges multiple field values based on type  
-**Line**: L97-130  
 **Type-Specific Merging**:
 - **Lists**: Extend all lists together
 - **Strings**: Concatenate with spaces
@@ -627,7 +602,6 @@ def __init__(
 )
 ```
 **Purpose**: Initialize Neo4j storage connection  
-**Line**: L14-27  
 **Attributes**:
 - `self.uri`: Database URI
 - `self.username`: Database username
@@ -642,7 +616,6 @@ def __init__(
 def connect(self)
 ```
 **Purpose**: Establishes Neo4j connection  
-**Line**: L31-36  
 **Returns**: Neo4j driver instance
 
 ---
@@ -652,7 +625,6 @@ def connect(self)
 def run_query(self, query: str)
 ```
 **Purpose**: Executes Cypher query without results  
-**Line**: L38-47  
 **Usage**: For CREATE, UPDATE, DELETE operations
 
 ---
@@ -662,7 +634,6 @@ def run_query(self, query: str)
 def run_query_with_result(self, query: str)
 ```
 **Purpose**: Executes Cypher query and returns results  
-**Line**: L152-161  
 **Returns**: List of records
 
 ---
@@ -675,7 +646,6 @@ def create_nodes(
 ) -> List[str]
 ```
 **Purpose**: Generates Cypher queries for node creation  
-**Line**: L166-191  
 **Process**:
 1. For each entity in KG:
    - Create node label (sanitized)
@@ -699,7 +669,7 @@ def create_relationships(
 ) -> List[str]
 ```
 **Purpose**: Generates Cypher queries for relationship creation  
-**Line**: L194-+  
+-+  
 **Process**:
 1. For each relationship in KG:
    - Sanitize start/end entity labels
@@ -724,7 +694,6 @@ SET r.properties = ...
 @staticmethod
 def transform_embeddings_to_str_list(embeddings: np.ndarray) -> str
 ```
-**Line**: L49-56  
 **Returns**: Comma-separated string of embeddings
 
 ##### `transform_str_list_to_embeddings()`
@@ -732,7 +701,6 @@ def transform_embeddings_to_str_list(embeddings: np.ndarray) -> str
 @staticmethod
 def transform_str_list_to_embeddings(embeddings: str) -> np.ndarray
 ```
-**Line**: L58-67  
 **Returns**: Reconstructed numpy array
 
 ##### `escape_str()`
@@ -740,7 +708,6 @@ def transform_str_list_to_embeddings(embeddings: str) -> np.ndarray
 @staticmethod
 def escape_str(s: str) -> str
 ```
-**Line**: L69-72  
 **Purpose**: Escapes double quotes for Cypher
 
 ##### `format_value()`
@@ -748,7 +715,6 @@ def escape_str(s: str) -> str
 @staticmethod
 def format_value(value) -> str
 ```
-**Line**: L74-77  
 **Purpose**: Converts value to escaped string
 
 ##### `format_property_value()`
@@ -756,7 +722,6 @@ def format_value(value) -> str
 @staticmethod
 def format_property_value(key: str, value) -> str
 ```
-**Line**: L79-104  
 **Purpose**: Formats property values for Cypher  
 **Handles**:
 - Embeddings (arrays → strings)
@@ -784,7 +749,6 @@ def __init__(
 ) -> None
 ```
 **Purpose**: Initialize provider-agnostic parser  
-**Line**: L61-80  
 **Auto-Detection**: Detects provider if not specified  
 **Attributes**:
 - `self.model`: LLM instance

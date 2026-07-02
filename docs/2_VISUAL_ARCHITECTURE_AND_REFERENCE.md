@@ -1,5 +1,15 @@
 # iText2KG - Visual Architecture & Quick Reference
 
+## 📋 Table of Contents
+
+1. [Architecture Diagram](#architecture-diagram)
+2. [Class Hierarchy & Dependencies](#class-hierarchy--dependencies)
+3. [Quick Reference - Key Methods by Task](#quick-reference---key-methods-by-task)
+4. [Configuration constants](#configuration-constants)
+5. [Testing entrypoints and ATOM's evaluation scripts](#testing-entry-points)
+6. [Important notes](#important-notes)
+
+
 ## Architecture Diagram
 
 ```
@@ -418,27 +428,6 @@ rel_threshold: float = 0.7   # Relationship matching cosine similarity threshold
 max_tries: int = 5                      # LLM extraction retries
 max_tries_isolated_entities: int = 3    # Isolated entity fix attempts
 sleep_time: int = 5                     # Seconds to sleep on error
-```
-
-### Rate Limiting (by provider)
-```python
-# OpenAI
-max_elements_per_batch=40
-max_tokens_per_batch=8000
-max_context_window=128000
-sleep_between_batches=2.0
-
-# Mistral
-max_elements_per_batch=1
-max_tokens_per_batch=10000
-max_context_window=128000
-sleep_between_batches=0.2
-
-# Claude
-max_elements_per_batch=50
-max_tokens_per_batch=8000
-max_context_window=200000
-sleep_between_batches=1.2
 ```
 
 ---
