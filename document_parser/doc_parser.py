@@ -43,7 +43,6 @@ remains flexible and optimized for extraction quality at runtime.
 
 import pandas as pd
 import asyncio
-import logging
 from itext2kg_atom.itext2kg.logging_config import get_logger
 import re
 from math import sqrt

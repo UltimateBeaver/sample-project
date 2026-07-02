@@ -211,7 +211,7 @@ __marimo__/
 /ignore
 /data/*.xlsx
 /data/translator_seeds/*.xlsx
-/data/knowledge_graphs/*
+/data/knowledge_graph/*
 /data/*.pkl
 /docker
 /neo4j

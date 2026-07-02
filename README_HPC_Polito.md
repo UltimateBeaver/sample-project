@@ -1,6 +1,13 @@
 # sample-project
 Sample repo for master's degree thesis
 
+# Table of contents
+* [Requirements](#requirements)
+* [Step by step installation](#installation-hpc-polito)
+* [Run the application](#run-the-application)
+* [Export, Import Knowledge Graphs](#export--import-knowledge-graphs)
+* [Developer tips](#developer-tips)
+
 # Requirements
 * Python (3.10 or greater) at https://www.python.org/downloads/
 * Apptainer (docker replacement)
@@ -197,7 +204,8 @@ In this guide there will be several steps in which you are required to copy-past
 
 5. Inspect the SLURM script *submit.sh* and edit the #SBATCH directives to your needs. Add execution permissions with `chmod +x submit.sh`.
 
-6. Run `sbatch submit.sh`. Some utilities commands are provided below:
+# Run the application
+* Run `sbatch submit.sh`. Some utilities commands are provided below:
     | Command    | Description |
     | -------- | ------- |
     | `squeue -u $(whoami)`  | To monitor your active queue status    |
@@ -210,7 +218,7 @@ In this guide there will be several steps in which you are required to copy-past
     * *model.log*: Shows how the LLM model is loading into the GPU.
     * *embedding.log*: Shows how the embedding model is running.
 
-7. Make sure you have properly set $HPC_USER and $HPC_HOST on `.env` file. Then move to a terminal on your host machine and double-check the following sections of `pull-from-HPC`. 
+* Move to a terminal on your host machine and double-check the following sections of `pull-from-HPC`. Make sure you have properly set $HPC_USER and $HPC_HOST on `.env` file.
     ```bash
     $LOCAL_PROJECT_ROOT = "." # Relative path to local repo on your host
 
@@ -220,7 +228,15 @@ In this guide there will be several steps in which you are required to copy-past
     ```
     Execute `pull-from-HPC.ps1` or `pull-from-HPC.sh` script, depending on your OS, to download Knowledge Graph dump database and application logs.
 
-
+# Export / Import Knowledge Graphs
+Execute the provided Graph Utility tool, through the following commands:
+```bash
+# Move to the python virtual environment (if not already there)
+venv/Scripts/activate
+# Make sure Neo4j container and Ollama/llama_cpp_servers are running!
+# Finally execute the Graph Utility tool
+python ./utils/kg_utility/graph_utility.py
+```
 
 ---
 # Developer tips

@@ -1,6 +1,14 @@
 # sample-project
 Sample repo for master's degree thesis
 
+# Table of contents
+* [Requirements](#requirements)
+* [Step by step installation](#installation)
+* [Run the application](#run-the-application)
+* [Export, Import Knowledge Graphs](#export--import-knowledge-graphs)
+* [Developer tips](#developer-tips)
+* [Bugfix checklist](#bugfix-checklist)
+
 # Requirements
 * Python (3.10 or greater) at https://www.python.org/downloads/
 * Docker at https://www.docker.com/
@@ -164,9 +172,19 @@ Sample repo for master's degree thesis
 ```bash
 # Move to the python virtual environment (if not already there)
 venv/Scripts/activate
-# Make sure Docker and Ollama/llama_cpp_servers are running!
+# Make sure Neo4j container and Ollama/llama_cpp_servers are running!
 # Finally execute the app
 python main.py
+```
+
+# Export / Import Knowledge Graphs
+Execute the provided Graph Utility tool, through the following commands:
+```bash
+# Move to the python virtual environment (if not already there)
+venv/Scripts/activate
+# Make sure Neo4j container and Ollama/llama_cpp_servers are running!
+# Finally execute the Graph Utility tool
+python ./utils/kg_utility/graph_utility.py
 ```
 
 ---
