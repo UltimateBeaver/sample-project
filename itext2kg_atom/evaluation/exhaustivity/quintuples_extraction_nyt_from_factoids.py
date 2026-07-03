@@ -18,6 +18,7 @@ import sys
 import asyncio
 import logging
 import time
+import ast
 from pathlib import Path
 
 import pandas as pd
@@ -28,12 +29,11 @@ current_file = Path(__file__).resolve()
 project_root = current_file.parent.parent.parent
 sys.path.append(str(project_root))
 
-from langchain_mistralai import ChatMistralAI
-from langchain_mistralai import MistralAIEmbeddings
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
-from atom.llm_output_parsing.langchain_output_parser import LangchainOutputParser
-from atom.models import RelationshipsExtractor, Prompt
+from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
+from itext2kg.atom.models import RelationshipsExtractor, Prompt
+from models.models import get_default_model, get_default_embedding_model
 
 # Configure logging
 logging.basicConfig(
@@ -52,59 +52,59 @@ logger.info("Setting up API connections...")
 # Global configuration vars
 # ==========================
 # Paths
-INPUT_DATASET_PATH: Path = project_root / "datasets" / "nyt_news" / "2020_nyt_COVID_last_version_ready_quintuples_gpt41_from_factoids_run2_run2.pkl"
-OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "nyt_news" / "2020_nyt_COVID_last_version_ready_quintuples_gpt41_from_factoids_run3.pkl"
+INPUT_DATASET_PATH: Path =  project_root / "datasets" / "atom" / "my_test_datasets" / "Annotazioni_1_with_factoids.pkl"
+OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "my_test_datasets" / "Annotazioni_1_with_quintuples.pkl"
 
 # Column names
-FACTOIDS_COL_NAME: str = "factoids_claude"
-DATE_COL_NAME: str = "date"
-QUINTUPLES_COL_NAME: str = "quintuples_gpt41_from_factoids_run3"
+FACTOIDS_COL_NAME: str = "factoids_g_truth"
+DATE_COL_NAME: str = "DATA"
+QUINTUPLES_COL_NAME: str = "quintuples_llamacpp"
 
 # Sampling: number of uniformly spaced indices to process. Set to None or 0 to process all
 SAMPLER_K: int | None = None
 
-mistral_api_key = "###"
-mistral_llm_model = ChatMistralAI(
-    api_key = mistral_api_key,
-    model="mistral-large-latest",
-    temperature=0,
-    max_retries=2,
-)
+# mistral_api_key = "###"
+# mistral_llm_model = ChatMistralAI(
+#     api_key = mistral_api_key,
+#     model="mistral-large-latest",
+#     temperature=0,
+#     max_retries=2,
+# )
 
 
-mistral_embeddings_model = MistralAIEmbeddings(
-    model="mistral-embed",
-    api_key = mistral_api_key
-)
+# mistral_embeddings_model = MistralAIEmbeddings(
+#     model="mistral-embed",
+#     api_key = mistral_api_key
+# )
 
 #gpt-4o-2024-11-20
 #gpt-4.1-2025-04-14
 #o3-mini-2025-01-31
 #openai_api_key = "###"
-openai_api_key = "###"
+# openai_api_key = "###"
 
-openai_llm_model = ChatOpenAI(
-    api_key = openai_api_key,
-    model="gpt-4.1-2025-04-14",
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
-)
+# openai_llm_model = ChatOpenAI(
+#     api_key = openai_api_key,
+#     model="gpt-4.1-2025-04-14",
+#     temperature=0,
+#     max_tokens=None,
+#     timeout=None,
+#     max_retries=2,
+# )
 
-openai_embeddings_model = OpenAIEmbeddings(
-    api_key = openai_api_key ,
-    model="text-embedding-3-large",
-)
+# openai_embeddings_model = OpenAIEmbeddings(
+#     api_key = openai_api_key ,
+#     model="text-embedding-3-large",
+# )
 
 lg_kg_construction = LangchainOutputParser(
-   llm_model=openai_llm_model,
-   embeddings_model=openai_embeddings_model
+   llm_model=get_default_model(),
+   embeddings_model=get_default_embedding_model()
 )
 
 logger.info("✅ LangchainOutputParser initialized successfully")
 
-print("📊 Loading dataset...")
+print("📊 Loading dataset (only first row, for testing)...")
 df_nyt = pd.read_pickle(INPUT_DATASET_PATH)
 logger.info(f"📋 Loaded dataset with {len(df_nyt)} rows")
 
@@ -206,7 +206,7 @@ async def main():
         logger.info(f"📝 Processing {len(selected_indices)} rows out of {num_rows} total")
 
         # Prepare contexts and timestamps for selected rows only
-        context_data = [df_nyt.iloc[i][FACTOIDS_COL_NAME] for i in selected_indices]
+        context_data = [ast.literal_eval(df_nyt.iloc[i][FACTOIDS_COL_NAME]) for i in selected_indices]
         timestamp_data = [df_nyt.iloc[i][DATE_COL_NAME] for i in selected_indices]
 
         # Extract quintuples for selected contexts

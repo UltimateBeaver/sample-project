@@ -110,6 +110,10 @@ Sample repo for master's degree thesis
     COLUMN_NAME_DATE=DATA
     COLUMN_NAME_PARAGRAPH=ARTICOLO
     COLUMN_NAME_SENTIMENT=SENTIMENTO
+    COLUMN_NAME_TRANSLATED_PARAGRAPH=translated_paragraph
+    COLUMN_NAME_TRANSLATED_SENTIMENT=translated_sentiment
+    COLUMN_NAME_DATE_TRANSLATED_PARAGRAPH=lead_paragraph_observation_date
+    COLUMN_NAME_FACTOIDS_EXTRACTED=factoids_extracted
     # Translation settings
     ENABLE_TRANSLATION=true
     ENABLE_TRANSLATOR_FEW_SHOT=true

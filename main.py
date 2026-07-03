@@ -18,16 +18,16 @@ base_embeddings_model = get_default_embedding_model()
 
 # Define a helper function to convert the dataframe's atomic facts into a dictionary,
 # where keys are observation dates and values are the combined list of atomic facts for that date.
-def to_dictionary(df:pd.DataFrame): 
+def to_dictionary(df:pd.DataFrame, column_name_atomic_facts: str): 
 
-    if isinstance(df['factoids_g_truth'][0], str):
-        df["factoids_g_truth"] = df["factoids_g_truth"].apply(lambda x:ast.literal_eval(x))
+    if isinstance(df[column_name_atomic_facts][0], str):
+        df[column_name_atomic_facts] = df[column_name_atomic_facts].apply(lambda x:ast.literal_eval(x))
     if num_rows_to_process > 0:
-        grouped_df = df.groupby(column_name_date)["factoids_g_truth"].sum().reset_index()[:num_rows_to_process]
+        grouped_df = df.groupby(column_name_date)[column_name_atomic_facts].sum().reset_index()[:num_rows_to_process]
     else:
-        grouped_df = df.groupby(column_name_date)["factoids_g_truth"].sum().reset_index()
+        grouped_df = df.groupby(column_name_date)[column_name_atomic_facts].sum().reset_index()
     return {
-        str(date): factoids for date, factoids in grouped_df.set_index(column_name_date)["factoids_g_truth"].to_dict().items()
+        str(date): factoids for date, factoids in grouped_df.set_index(column_name_date)[column_name_atomic_facts].to_dict().items()
         }
 
 
@@ -38,18 +38,7 @@ async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
         llm_model=base_llm_model,
         enable_translation=enable_translation
     )
-    result_df = await parser.parse_excel(
-        input_excel_path=doc_parser_input_excel_path,
-        output_excel_path=doc_parser_output_excel_path,
-        column_name_date=column_name_date,
-        column_name_paragraph=column_name_paragraph,
-        column_name_sentiment=column_name_sentiment,
-        num_rows_to_process=num_rows_to_process,
-        doc_parser_enable_parallel_processing=doc_parser_enable_parallel_processing,
-        batch_size=doc_parser_batch_size,  # Process N paragraphs in parallel per batch
-        apply_post_processing=True,  # Enable post-processing
-        translation_batch_size=translator_batch_size  # Process N paragraphs in parallel for translation
-    )
+    result_df = await parser.parse_excel(apply_post_processing=True)
     print("\n" + "=" * 70)
     print("📊 EXTRACTION RESULTS")
     print("=" * 70)
@@ -57,10 +46,10 @@ async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
     for idx, row in result_df.iterrows():
         print(f"\n📅 Date: {row[column_name_date]}")
         print(f"📄 Paragraph: {row[column_name_paragraph][:100]}...")
-        print(f"✨ Extracted Atomic Facts ({len(row['factoids_g_truth'])} facts):")
+        print(f"✨ Extracted Atomic Facts ({len(row[column_name_factoids_extracted])} facts):")
         
-        if isinstance(row['factoids_g_truth'], list) and len(row['factoids_g_truth']) > 0:
-            for i, fact in enumerate(row['factoids_g_truth'], 1):
+        if isinstance(row[column_name_factoids_extracted], list) and len(row[column_name_factoids_extracted]) > 0:
+            for i, fact in enumerate(row[column_name_factoids_extracted], 1):
                 print(f"   {i}. {fact}")
         else:
             print("   [No facts extracted]")
@@ -73,7 +62,7 @@ async def parse_news_paragraphs_into_atomic_facts() -> pd.DataFrame:
     print("\n📈 SUMMARY STATISTICS")
     print("-" * 70)
     total_factoids = sum(len(facts) if isinstance(facts, list) else 0 
-                        for facts in result_df['factoids_g_truth'])
+                        for facts in result_df[column_name_factoids_extracted])
     print(f"Total rows processed: {len(result_df)}")
     print(f"Total atomic facts extracted: {total_factoids}")
     print(f"Average factoids per paragraph: {total_factoids / len(result_df):.1f}")
@@ -120,8 +109,9 @@ async def main():
     When reading the df_atomic_facts.to_pickle() I get tons of warnings for failed JSON parsing.
     """
 
+    news_covid_dict = news_covid
     # Convert the dataframe into the required dictionary format
-    news_covid_dict = to_dictionary(news_covid)
+    news_covid_dict = to_dictionary(news_covid, column_name_factoids_extracted)
 
     # Initialize the ATOM pipeline with the LLM and embedding models
     atom = Atom(llm_model=base_llm_model, embeddings_model=base_embeddings_model)

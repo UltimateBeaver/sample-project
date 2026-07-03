@@ -634,7 +634,7 @@ async def main():
             
             # Import ATOM modules (these need to be imported after sys.path modification)
             try:
-                from atom.llm_output_parsing.langchain_output_parser import LangchainOutputParser
+                from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
                 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
                 print("   ✅ ATOM modules imported successfully")
                 logger.info("ATOM modules imported successfully")

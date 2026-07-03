@@ -8,7 +8,7 @@ This script:
    - Decontextualization: Pronouns replaced with full entity names
    - Temporal normalization: Relative time references converted to absolute dates
    - End actions: Termination of roles/actions captured with timestamps
-3. Saves the results to a new column: factoids_g_truth
+3. Saves the results to a new column: factoids_extracted
 
 Usage:
     parser = DocumentParser(llm_model)
@@ -54,6 +54,11 @@ from difflib import SequenceMatcher
 from itext2kg_atom.itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg_atom.itext2kg.atom.models import AtomicFact
 from translation.translator import TranslationService
+from env_config import (
+    num_rows_to_process, doc_parser_input_excel_path, doc_parser_output_excel_path, doc_parser_enable_parallel_processing, doc_parser_batch_size,
+    column_name_date, column_name_paragraph, column_name_sentiment, column_name_translated_sentiment, column_name_factoids_extracted, column_name_translated_paragraph, column_name_date_translated_paragraph,
+    translator_batch_size
+)
 
 # Set up logger for this module
 logger = get_logger(__name__)
@@ -647,16 +652,7 @@ Return the extracted information strictly adhering to the requested format.
     
     async def parse_excel(
         self, 
-        input_excel_path: str, 
-        output_excel_path: Optional[str] = None,
-        column_name_date: str = 'date',
-        column_name_paragraph: str = 'lead_paragraph',
-        column_name_sentiment: str = 'sentiment_score',
-        num_rows_to_process: int = 0, # 0 means process all rows
-        doc_parser_enable_parallel_processing: bool = True,
-        batch_size: int = 2,
         apply_post_processing: bool = True,
-        translation_batch_size: int = 2,
     ) -> pd.DataFrame:
         """
         Read an Excel file, extract atomic facts for each paragraph, and save results.
@@ -664,29 +660,24 @@ Return the extracted information strictly adhering to the requested format.
         Supports multilingual input with automatic translation to English.
         
         Args:
-            input_excel_path: Path to input Excel file with columns: date, lead_paragraph
-            output_excel_path: Path to save output Excel file. If None, overwrites input file
-            column_name_date: Name of the column containing dates (default: 'date')
-            column_name_paragraph: Name of the column containing paragraphs (default: 'lead_paragraph')
-            batch_size: Number of paragraphs to process in parallel per batch (default: 2)
             apply_post_processing: Whether to apply post-processing (date normalization, deduplication)
-            enable_translation: Whether to enable translation for non-English inputs. Default: False
             
         Returns:
-            DataFrame with added factoids_g_truth column
+            DataFrame with added factoids_extracted column
         """
         # Read the Excel file
         if num_rows_to_process > 0:
-            df = pd.read_excel(input_excel_path, nrows=num_rows_to_process)
-            logger.info(f"Loaded first {num_rows_to_process} rows from '{input_excel_path}'")
+            df = pd.read_excel(doc_parser_input_excel_path, nrows=num_rows_to_process)
+            logger.info(f"Loaded first {num_rows_to_process} rows from '{doc_parser_input_excel_path}'")
         else:
-            df = pd.read_excel(input_excel_path)
-            logger.info(f"Loaded all rows from '{input_excel_path}'")
+            df = pd.read_excel(doc_parser_input_excel_path)
+            logger.info(f"Loaded all rows from '{doc_parser_input_excel_path}'")
         
         # Validate required columns
         if column_name_date not in df.columns or column_name_paragraph not in df.columns:
             raise ValueError(f"Excel file must contain '{column_name_date}' and '{column_name_paragraph}' columns")
 
+        column_name_paragraph_to_parse = column_name_paragraph
 
         if self.enable_translation:
             # Validate optional sentiment column
@@ -704,21 +695,22 @@ Return the extracted information strictly adhering to the requested format.
                     else:
                         logger.error(f"Could not extract float from sentiment value '{s}'. Defaulting to 3.0")
                         sentiments.append(3.0)
-                df["sentiment_float"] = sentiments
+                #df["sentiment_float"] = sentiments
+                df[column_name_sentiment] = sentiments
 
             # Translate the dataset
-            paragraphs = df[column_name_paragraph].tolist()
+            paragraphs = df[column_name_paragraph_to_parse].tolist()
             logger.info(f"📝 Translating {len(paragraphs)} paragraphs from Italian to English...")
             try:
-                paragraphs_to_process, sentiments_translated = await self.translator.translate_batch(paragraphs, sentiments, batch_size=translation_batch_size)
+                paragraphs_to_process, sentiments_translated = await self.translator.translate_batch(paragraphs, sentiments, batch_size=translator_batch_size)
                 logger.info(f"✅ Translation completed for {len(paragraphs_to_process)} paragraphs")
 
                 # Add a new column for translated paragraphs
-                df['translated_paragraph'] = paragraphs_to_process
-                column_name_paragraph = 'translated_paragraph'  # Update to use translated paragraphs for processing
+                df[column_name_translated_paragraph] = paragraphs_to_process
+                column_name_paragraph_to_parse = column_name_translated_paragraph  # Update to use translated paragraphs for processing
                 # If not None, add a new column for translated sentiments and compute translation metrics
                 if sentiments_str is not None:
-                    df['translated_sentiment'] = sentiments_translated
+                    df[column_name_translated_sentiment] = sentiments_translated
                     # Compute sentiment metrics
                     self.compute_translation_sentiment_metrics(sentiments, sentiments_translated)
             except Exception as e:
@@ -726,22 +718,22 @@ Return the extracted information strictly adhering to the requested format.
 
 
         # Create the combined column 'lead_paragraph_observation_date'
-        logger.info("Creating 'lead_paragraph_observation_date' column...")
-        df['lead_paragraph_observation_date'] = df.apply(
-            lambda row: f"Observation date: {row[column_name_date]}. {row[column_name_paragraph]}",
+        logger.info(f"Creating {column_name_date_translated_paragraph} column...")
+        df[column_name_date_translated_paragraph] = df.apply(
+            lambda row: f"Observation date: {row[column_name_date]}. {row[column_name_paragraph_to_parse]}",
             axis=1
         )
         logger.info("✅ Combined column created successfully")
 
         # Pre-processing
         # Normalize each temporal reference strings in the 'lead_paragraph_observation_date' column to ensure consistent formatting for the LLM
-        # df['lead_paragraph_observation_date'] = [normalize_relative_dates_in_fact(fact, df.loc[idx, 'date']) for idx, fact in enumerate(df['lead_paragraph_observation_date'])]
+        # df[column_name_date_translated_paragraph] = [normalize_relative_dates_in_fact(fact, df.loc[idx, 'date']) for idx, fact in enumerate(df[column_name_date_translated_paragraph])]
         # Date normalization should be done in post processing after extraction
         # i.e. this year's edition of Art Basel -> yyyy-mm-dd will translate the following fact into:
         # "Art Basel Hong Kong, an important destination in the international art market calendar, was canceled on 2020-01-01's edition"
 
-        # Initialize the factoids_g_truth column
-        df['factoids_g_truth'] = None
+        # Initialize the factoids_extracted column
+        df[column_name_factoids_extracted] = None
         factoids_list = [[] for _ in range(len(df))]
         
         # Convert dates to strings and prepare data
@@ -751,7 +743,7 @@ Return the extracted information strictly adhering to the requested format.
         
         for idx, row in df.iterrows():
             date = row[column_name_date]
-            paragraph = row['lead_paragraph_observation_date']
+            paragraph = row[column_name_date_translated_paragraph]
             
             # Convert date to string if needed
             if isinstance(date, datetime):
@@ -765,15 +757,15 @@ Return the extracted information strictly adhering to the requested format.
         
         # Process paragraphs in parallel batches
         total_rows = len(df)
-        num_batches = (total_rows + batch_size - 1) // batch_size
+        num_batches = (total_rows + doc_parser_batch_size - 1) // doc_parser_batch_size
         
-        logger.info(f"Processing {total_rows} rows in {num_batches} batches (batch size: {batch_size})")
+        logger.info(f"Processing {total_rows} rows in {num_batches} batches (batch size: {doc_parser_batch_size})")
         
         # Create batch tasks
         batch_tasks = []
         for batch_idx in range(num_batches):
-            start_idx = batch_idx * batch_size
-            end_idx = min(start_idx + batch_size, total_rows)
+            start_idx = batch_idx * doc_parser_batch_size
+            end_idx = min(start_idx + doc_parser_batch_size, total_rows)
             
             batch_paragraphs = paragraphs[start_idx:end_idx]
             batch_dates = dates[start_idx:end_idx]
@@ -814,10 +806,10 @@ Return the extracted information strictly adhering to the requested format.
                 factoids_list[row_idx] = facts
         
         # Add the extracted factoids to the dataframe
-        df['factoids_g_truth'] = factoids_list
+        df[column_name_factoids_extracted] = factoids_list
         
         # Save the output Excel file
-        output_path = output_excel_path or input_excel_path
+        output_path = doc_parser_output_excel_path or doc_parser_input_excel_path
         logger.info(f"Saving results to: {output_path}")
         df.to_excel(output_path, index=False)
         
@@ -903,9 +895,7 @@ Return the extracted information strictly adhering to the requested format.
 
 async def demo_parse_documents(
     llm_model, 
-    input_excel_path: str, 
-    output_excel_path: Optional[str] = None,
-    batch_size: int = 5,
+    enable_translation: bool = False,
     apply_post_processing: bool = True
 ):
     """
@@ -913,21 +903,13 @@ async def demo_parse_documents(
     
     Args:
         llm_model: The language model instance
-        input_excel_path: Path to input Excel file
-        output_excel_path: Path to output Excel file (optional)
-        batch_size: Number of paragraphs to process in parallel per batch (default: 5)
-                   Increase for faster processing (with more parallel requests),
-                   decrease to reduce memory usage or API rate limit concerns
         apply_post_processing: Whether to apply post-processing (date normalization, deduplication)
         
     Returns:
         DataFrame with extracted atomic facts
     """
-    parser = DocumentParser(llm_model=llm_model)
+    parser = DocumentParser(llm_model=llm_model, enable_translation=enable_translation)
     result_df = await parser.parse_excel(
-        input_excel_path, 
-        output_excel_path,
-        batch_size=batch_size,
         apply_post_processing=apply_post_processing
     )
     return result_df

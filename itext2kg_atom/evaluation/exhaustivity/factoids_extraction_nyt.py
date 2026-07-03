@@ -31,6 +31,8 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg.atom.models import AtomicFact
+
+from models.models import get_default_model, get_default_embedding_model
 # from langchain_anthropic import ChatAnthropic
 
 
@@ -57,8 +59,10 @@ logger.info("Setting up API connections...")
 # Global configuration vars
 # ==========================
 # Paths
-INPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "nyt_news" / "2020_nyt_COVID_last_version_ready.pkl"
-OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "nyt_news" / "2020_nyt_COVID_last_version_ready_factoids_llamacpp.pkl"
+# INPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "nyt_news" / "2020_nyt_COVID_last_version_ready.pkl"
+# OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "nyt_news" / "2020_nyt_COVID_last_version_ready_factoids_llamacpp.pkl"
+INPUT_DATASET_PATH: Path =  project_root / "datasets" / "atom" / "my_test_datasets" / "dataset.pkl"
+OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "my_test_datasets" / "dataset_with_factoids.pkl"
 
 # Column names
 # It could be used on the cumulative lead_paragraph_observation_date. You can change "lead_paragraph_observation_date" 
@@ -121,18 +125,9 @@ openai_embeddings_model = OpenAIEmbeddings(
 )
 
 # --- Local / Native Llama.cpp Server --------------------------------------
-model_llamacpp_gemma4 = ChatOpenAI(
-    api_key=openai_api_key,
-    base_url="http://localhost:8080/v1",
-    model="gemma4",  # The server ignores this string, but ChatOpenAI requires it
-    temperature=0,
-)
+model_llamacpp_gemma4 = get_default_model()
 # --- Local / Native Llama.cpp Embeddings ----------------------------------
-embeddings_llamacpp_nomic = OpenAIEmbeddings(
-    api_key="llama_cpp", # Dummy key required by LangChain
-    base_url="http://localhost:8081/v1",
-    model="nomic-embed-text", 
-)
+embeddings_llamacpp_nomic = get_default_embedding_model()
 
 lg_kg_construction = LangchainOutputParser(
    llm_model=model_llamacpp_gemma4,
