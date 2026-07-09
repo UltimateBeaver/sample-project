@@ -18,6 +18,7 @@ import json
 import logging
 import time
 import argparse
+import ast
 import numpy as np
 import pandas as pd
 import pickle
@@ -29,8 +30,8 @@ from pathlib import Path
 
 from models.models import get_default_model, get_default_embedding_model
 from env_config import (
-    column_name_quintuples_ground_truth, 
-    eval_input_dataset_path, eval_output_dataset_path, eval_checkpoint_factoids_path, eval_model_postfixes_list, num_rows_to_process
+    column_name_quintuples_ground_truth, column_name_quintuples_extracted, column_name_quintuples_extracted_from_raw_text,
+    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list, num_rows_to_process
 )
 
 # Add the project root to Python path (same pattern as exhaustivity_evaluation_nyt.py)
@@ -56,22 +57,63 @@ logger.info("Setting up configuration and API connections...")
 # ============================================================================
 
 # Data configuration
-DATA_PATH = project_root / "datasets" / "nyt_news" / "2020_nyt_COVID_last_version_ready_quintuples_gpt41_from_factoids.pkl"
+DATA_PATH = project_root / eval_output_dataset_path
 GOLD_COL = column_name_quintuples_ground_truth
-PREDICTED_COL_CASE1 = "quintuples_gpt41"
-PREDICTED_COL_CASE2 = "quintuples_gpt41_from_factoids"
+PREDICTED_COL_CASE1 = column_name_quintuples_extracted_from_raw_text    # Concatenated with postfix in main()
+PREDICTED_COL_CASE2 = column_name_quintuples_extracted                  # Concatenated with postfix in main()
 
 # Analysis parameters
 SIMILARITY_THRESHOLD = 0.7
 MAX_SAMPLES = None # Set to None for all samples, or integer for limit
 
 # Output configuration
-OUTPUT_JSON = project_root / "evaluation" / "quintuples_quality_results.json"
-GOLD_EMBEDDINGS_CACHE = project_root / "evaluation" / "gold_quintuples_embeddings_cache.pkl"
+OUTPUT_JSON = project_root / eval_output_results_path / "quintuples_quality_results.json"
+GOLD_EMBEDDINGS_CACHE = project_root / eval_output_results_path / "gold_quintuples_embeddings_cache.pkl"
 
 # ============================================================================
 # CORE FUNCTIONS
 # ============================================================================
+
+def normalize_quintuples_list(value):
+    """
+    Normalizes a pandas cell value into a list of quintuples (5-tuples).
+    Handles raw lists/tuples, stringified representations, and missing data.
+    """
+    #parsed = value
+
+    # Convert string representation to Python objects
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value in ('[]', '()'):
+            return []
+        try:
+            value = ast.literal_eval(value)
+        except Exception:
+            return []
+    
+    # If it's a NumPy array, convert it to a standard Python list
+    if type(value).__name__ == 'ndarray':
+        value = value.tolist()
+
+    if isinstance(value, (list, tuple)):
+        if len(value) == 0:
+            return []
+
+        # Edge Case: Single quintuple passed directly
+        if len(value) == 5 and isinstance(value[0], str):
+            return [tuple(value)]
+
+        # Standard Case: Extract valid 5-tuples
+        normalized = []
+        for item in value:
+            if isinstance(item, (list, tuple)) and len(item) == 5:
+                normalized.append(tuple(item))
+        return normalized
+
+    if pd.isna(value):
+        return []
+    # Catch-all fallback for unexpected types
+    return []
 
 def save_gold_embeddings_cache(gold_embeddings, gold_quintuples, cache_path):
     """Save gold embeddings to cache file."""
@@ -306,7 +348,7 @@ async def calculate_comprehensive_metrics(quintuples, gold_quintuples, lg_kg_con
         'total_gold': total_gold
     }
 
-async def evaluate_quintuples_quality(df, lg_kg_construction, threshold=0.7, max_samples=None):
+async def evaluate_quintuples_quality(df, lg_kg_construction, threshold=0.7, max_samples=None, col_quintuples_extracted_from_raw_text_postfix=PREDICTED_COL_CASE1, col_quintuples_extracted_postfix=PREDICTED_COL_CASE2):
     """
     Evaluate quintuples quality for both cases with comprehensive metrics.
     
@@ -323,7 +365,7 @@ async def evaluate_quintuples_quality(df, lg_kg_construction, threshold=0.7, max
     logger.info(f"Starting quality evaluation with threshold {threshold}")
     
     # Check if columns exist
-    required_cols = [GOLD_COL, PREDICTED_COL_CASE1, PREDICTED_COL_CASE2]
+    required_cols = [GOLD_COL, col_quintuples_extracted_from_raw_text_postfix, col_quintuples_extracted_postfix]
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
         logger.error(f"Missing columns: {missing_cols}")
@@ -331,8 +373,8 @@ async def evaluate_quintuples_quality(df, lg_kg_construction, threshold=0.7, max
     
     # Filter valid rows (rows where all required columns have data)
     valid_indices = (df[GOLD_COL].notna() & 
-                    df[PREDICTED_COL_CASE1].notna() & 
-                    df[PREDICTED_COL_CASE2].notna())
+                    df[col_quintuples_extracted_from_raw_text_postfix].notna() & 
+                    df[col_quintuples_extracted_postfix].notna())
     valid_df = df[valid_indices].copy()
     
     if max_samples:
@@ -363,7 +405,7 @@ async def evaluate_quintuples_quality(df, lg_kg_construction, threshold=0.7, max
     
     # Collect all unique gold quintuples for caching
     for idx in valid_df.index:
-        gold_quintuples = valid_df[GOLD_COL].loc[idx]
+        gold_quintuples = normalize_quintuples_list(valid_df[GOLD_COL].loc[idx])
         if gold_quintuples:
             for gq in gold_quintuples:
                 gold_text = f"{gq[0]} {gq[1]} {gq[2]}"
@@ -396,9 +438,9 @@ async def evaluate_quintuples_quality(df, lg_kg_construction, threshold=0.7, max
         if row_idx % 10 == 0:
             logger.info(f"Processing row {row_idx + 1}/{len(valid_df)}")
         
-        gold_quintuples = valid_df[GOLD_COL].loc[idx]
-        case1_quintuples = valid_df[PREDICTED_COL_CASE1].loc[idx]
-        case2_quintuples = valid_df[PREDICTED_COL_CASE2].loc[idx]
+        gold_quintuples = normalize_quintuples_list(valid_df[GOLD_COL].loc[idx])
+        case1_quintuples = normalize_quintuples_list(valid_df[col_quintuples_extracted_from_raw_text_postfix].loc[idx])
+        case2_quintuples = normalize_quintuples_list(valid_df[col_quintuples_extracted_postfix].loc[idx])
         
         if not gold_quintuples:
             continue
@@ -530,13 +572,13 @@ def save_results_to_json(results, summary, output_path):
         logger.error(f"Failed to save results to {output_path}: {e}")
         raise
 
-def print_summary_report(summary):
+def print_summary_report(summary, model_postfix):
     """Print a formatted summary report."""
     print("\n📊 QUINTUPLES QUALITY EVALUATION SUMMARY")
     print("=" * 80)
     
     for case_name, case_summary in summary.items():
-        case_display = "GPT-4.1 Direct" if case_name == 'case1' else "GPT-4.1 from Factoids"
+        case_display = f"{model_postfix} Direct" if case_name == 'case1' else f"{model_postfix} from Factoids"
         print(f"\n🔍 {case_display}")
         print("-" * 60)
         
@@ -586,6 +628,8 @@ def parse_arguments():
                        help='Maximum number of samples to process (for testing)')
     parser.add_argument('--threshold', '-t', type=float, default=0.7,
                        help='Similarity threshold for matching')
+    parser.add_argument('--model-postfix', '-p', type=str, required=True,
+                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
     return parser.parse_args()
 
 async def main():
@@ -596,6 +640,16 @@ async def main():
     
     # Parse command line arguments
     args = parse_arguments()
+
+    if not args.model_postfix:
+        logger.error('--model-postfix arg not provided')
+        return
+    if args.model_postfix not in eval_model_postfixes_list:
+        logger.error(f'Unsupported --model-postfix arg. Supported ones are: {eval_model_postfixes_list}')
+        return
+
+    quintuples_extracted_from_raw_text_postfix = f"{PREDICTED_COL_CASE1}_{args.model_postfix}"
+    quintuples_extracted_postfix = f"{PREDICTED_COL_CASE2}_{args.model_postfix}"
     
     print("🎯 Starting Quintuples Quality Evaluation")
     print("=" * 50)
@@ -617,7 +671,6 @@ async def main():
         # Import ATOM modules
         try:
             from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
-            from langchain_openai import ChatOpenAI, OpenAIEmbeddings
             print("   ✅ ATOM modules imported successfully")
             logger.info("ATOM modules imported successfully")
         except ImportError as e:
@@ -641,24 +694,10 @@ async def main():
         print("🤖 Initializing language model components...")
         logger.info("Initializing language model components")
         try:
-            openai_api_key = "###"
-            
-            openai_llm_model = ChatOpenAI(
-                api_key=openai_api_key,
-                model="o3-mini",
-                max_tokens=None,
-                timeout=None,
-                max_retries=2,
-            )
-            
-            openai_embeddings_model = OpenAIEmbeddings(
-                api_key=openai_api_key,
-                model="text-embedding-3-large",
-            )
             
             lg_kg_construction = LangchainOutputParser(
-                llm_model=openai_llm_model,
-                embeddings_model=openai_embeddings_model
+                llm_model=get_default_model(),
+                embeddings_model=get_default_embedding_model()
             )
             print("   ✅ Language model components initialized")
             logger.info("Language model components initialized successfully")
@@ -675,7 +714,9 @@ async def main():
             df=df,
             lg_kg_construction=lg_kg_construction,
             threshold=SIMILARITY_THRESHOLD,
-            max_samples=MAX_SAMPLES
+            max_samples=MAX_SAMPLES,
+            col_quintuples_extracted_from_raw_text_postfix=quintuples_extracted_from_raw_text_postfix,
+            col_quintuples_extracted_postfix=quintuples_extracted_postfix,
         )
         
         if results is None:
@@ -690,7 +731,7 @@ async def main():
         save_results_to_json(results, summary, OUTPUT_JSON)
         
         # Print summary report
-        print_summary_report(summary)
+        print_summary_report(summary, args.model_postfix)
         
         elapsed_time = time.time() - start_time
         print("\n✨ Evaluation complete!")
