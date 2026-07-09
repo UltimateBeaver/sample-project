@@ -37,9 +37,24 @@ column_name_translated_sentiment =          os.getenv("COLUMN_NAME_TRANSLATED_SE
 column_name_date_translated_paragraph =     os.getenv("COLUMN_NAME_DATE_TRANSLATED_PARAGRAPH",      "lead_paragraph_observation_date")
 column_name_factoids_extracted =            os.getenv("COLUMN_NAME_FACTOIDS_EXTRACTED",             "factoids_extracted")
 column_name_factoids_ground_truth =         os.getenv("COLUMN_NAME_FACTOIDS_GROUND_TRUTH",          "factoids_g_truth")
+column_name_quintuples_ground_truth =       os.getenv("COLUMN_NAME_QUINTUPLES_GROUND_TRUTH",        "quintuples_g_truth")
+column_name_quintuples_extracted =          os.getenv("COLUMN_NAME_QUINTUPLES_EXTRACTED",           "quintuples_extracted")
+column_name_quintuples_extracted_from_raw_text = os.getenv("COLUMN_NAME_QUINTUPLES_EXTRACTED_FROM_RAW_TEXT",           "quintuples_extracted_from_raw_text")
+column_name_factoids_prompt_tokenc =        os.getenv("COLUMN_NAME_FACTOIDS_EXTRACTION_PROMPT_TOKEN_COUNT",           "factoids_prompt_tokenc")
+column_name_quintuples_prompt_tokenc =      os.getenv("COLUMN_NAME_QUINTUPLES_EXTRACTION_PROMPT_TOKEN_COUNT",         "quintuples_prompt_tokenc")
+column_name_quintuples_raw_prompt_tokenc =  os.getenv("COLUMN_NAME_QUINTUPLES_RAW_EXTRACTION_PROMPT_TOKEN_COUNT",     "quintuples_raw_prompt_tokenc")
 
 # Language configuration
 enable_translation =                        os.getenv("ENABLE_TRANSLATION",         "false").lower() == "true"  # Auto-translate if not English
 enable_translator_few_shot =                os.getenv("ENABLE_TRANSLATOR_FEW_SHOT", "false").lower() == "true"  # Whether to use few shot examples for sentiment evaluation or not
-translator_batch_size =                     int(os.getenv("TRANSLATOR_BATCH_SIZE",  2))                  # Batch size for translation
-translator_few_shot_seed =                  os.getenv("TRANSLATOR_FEW_SHOT_SEED",   42)                   # Seed for extracting random 5 samples for few shot sentiment context
+translator_batch_size =                     int(os.getenv("TRANSLATOR_BATCH_SIZE",  2))                         # Batch size for translation
+translator_few_shot_seed =                  int(os.getenv("TRANSLATOR_FEW_SHOT_SEED",   42))                    # Seed for extracting random 5 samples for few shot sentiment context
+
+# Evaluation configuration
+eval_input_dataset_path =                   os.getenv("EVAL_INPUT_DATASET_PATH",            "./datasets/atom/my_test_datasets/dataset.pkl")
+eval_output_dataset_path =                  os.getenv("EVAL_OUTPUT_DATASET_PATH",           "./datasets/atom/my_test_datasets/dataset_with_factoids.pkl")
+eval_output_results_path =                  os.getenv("EVAL_OUTPUT_RESULTS_PATH",           "./datasets/atom/my_test_datasets/evaluation_results")
+eval_checkpoint_factoids_path =             os.getenv("EVAL_CHECKPOINT_FACTOIDS_PATH",      "./datasets/atom/my_test_datasets/factoids_checkpoint.json")
+eval_checkpoint_quintuples_path =           os.getenv("EVAL_CHECKPOINT_QUINTUPLES_PATH",    "./datasets/atom/my_test_datasets/quintuples_checkpoint.json")
+eval_model_postfixes_list =                 (os.getenv("EVAL_MODEL_POSTFIXES_LIST",          "_llamacpp_gemma4 _ollama_gemma4")).split(" ")
+eval_model_postfixes_to_plot_list =         (os.getenv("EVAL_MODEL_POSTFIXES_TO_PLOT_LIST",  "_llamacpp_gemma4 _ollama_gemma4")).split(" ")

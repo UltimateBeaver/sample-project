@@ -22,6 +22,10 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import sys
 
+from env_config import (
+    eval_output_results_path, eval_model_postfixes_to_plot_list
+)
+
 # Add the project root to Python path
 current_file = Path(__file__).resolve()
 project_root = current_file.parent.parent.parent
@@ -45,12 +49,12 @@ logger.info("Setting up combined plot configuration...")
 # ============================================================================
 
 # Input JSON files
-FACTOIDS_JSON = project_root / "evaluation" / "exhaustivity_factoids_results.json"
-QUINTUPLES_JSON = project_root / "evaluation" / "exhaustivity_results.json"
+FACTOIDS_JSON = project_root / eval_output_results_path / "exhaustivity_factoids_results.json"
+QUINTUPLES_JSON = project_root / eval_output_results_path / "exhaustivity_quintuples_results.json"
 
 # Output configuration
-OUTPUT_PLOT_PNG = project_root / "evaluation" / "combined_exhaustivity_plot_publication.png"
-OUTPUT_PLOT_PDF = project_root / "evaluation" / "combined_exhaustivity_plot_publication.pdf"
+OUTPUT_PLOT_PNG = project_root / eval_output_results_path / "combined_exhaustivity_plot_publication.png"
+OUTPUT_PLOT_PDF = project_root / eval_output_results_path / "combined_exhaustivity_plot_publication.pdf"
 
 # Publication-quality plot settings
 FIGURE_WIDTH = 5.5  # inches (slightly wider for better readability)
@@ -58,24 +62,21 @@ FIGURE_HEIGHT = 7.0  # inches (taller to accommodate two subplots + bottom legen
 DPI = 300
 
 # Models for publication plot
-PUBLICATION_MODELS = ['claude', 'gpt4o', 'mistral', 'o3mini', 'gpt41']
+PUBLICATION_MODELS = eval_model_postfixes_to_plot_list
 
 # Publication color palette (colorblind-friendly)
 COLORS = {
-    'claude': '#1f77b4',    # Blue
-    'gpt4o': '#ff7f0e',     # Orange  
-    'mistral': '#2ca02c',   # Green
-    'o3mini': '#d62728',    # Red
-    'gpt41': '#9467bd'      # Purple
+    'llamacpp_gemma4': '#1f77b4',    # Blue
+    'ollama_gemma4': '#ff7f0e',     # Orange  
+    # 'mistral': '#2ca02c',   # Green
+    # 'o3mini': '#d62728',    # Red
+    # 'gpt41': '#9467bd'      # Purple
 }
 
 # Precise model names for legend display
 MODEL_DISPLAY_NAMES = {
-    'claude': 'claude-sonnet-4-2025-01-31',
-    'gpt4o': 'gpt-4o-2024-11-20',
-    'mistral': 'mistral-large-2411',
-    'o3mini': 'o3-mini-2025-01-31',
-    'gpt41': 'gpt-4.1-2025-04-14'
+    'llamacpp_gemma4': 'llama.cpp-gemma4-e4b',
+    'ollama_gemma4': 'ollama-gemma4-e4b',
 }
 
 # Font sizes for publication
@@ -341,25 +342,17 @@ def create_combined_exhaustivity_plot(factoids_results, quintuples_results):
     legend_labels = []
     
     # Define the order for models in legend
-    ordered_model_labels = [
-        MODEL_DISPLAY_NAMES["claude"],
-        MODEL_DISPLAY_NAMES["gpt4o"], 
-        MODEL_DISPLAY_NAMES["mistral"],
-        MODEL_DISPLAY_NAMES["o3mini"],
-        MODEL_DISPLAY_NAMES["gpt41"]
-    ]
-    
-    ordered_model_keys = ["claude", "gpt4o", "mistral", "o3mini", "gpt41"]
+    # TODO
     
     # Add model entries with filled colored rectangles
-    for model_key, model_label in zip(ordered_model_keys, ordered_model_labels):
+    for model_key in zip(PUBLICATION_MODELS):
         color = COLORS.get(model_key, '#666666')
         
         # Create filled rectangle for each model
         model_patch = Rectangle((0, 0), 1, 1, facecolor=color, edgecolor='black', 
                                linewidth=1, alpha=0.85)
         legend_handles.append(model_patch)
-        legend_labels.append(model_label)
+        legend_labels.append(MODEL_DISPLAY_NAMES.get(model_key))
     
     # Add factual symbol (transparent with stroke)
     factual_patch = Rectangle((0, 0), 1, 1, facecolor='none', edgecolor='black', 

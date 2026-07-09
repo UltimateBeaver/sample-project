@@ -23,10 +23,20 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import dateparser
+from dateparser.search import search_dates
+import re
+from scipy.optimize import linear_sum_assignment
 from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
 import sys
 from pathlib import Path
+import ast
+
+from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    column_name_factoids_ground_truth, column_name_factoids_extracted, column_name_factoids_prompt_tokenc,
+    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list, eval_model_postfixes_to_plot_list
+)
 
 # Add the project root to Python path
 current_file = Path(__file__).resolve()
@@ -51,25 +61,26 @@ logger.info("Setting up configuration and API connections...")
 # ============================================================================
 
 # Models to evaluate (all available models - will be filtered for publication quality in plotting)
-MODEL_NAMES = ['claude', 'gpt4o', 'mistral', 'o3mini', 'gpt41']
+MODEL_NAMES = eval_model_postfixes_list
 
 # Data configuration - adapted for factoids
-DATA_PATH = project_root / "datasets" / "nyt_news" / "subset_2020_nyt_COVID_final_final.pkl"
-PREDICTED_COL_TEMPLATE = "cumul_factoids_{}"
-GOLD_COL = "cumul_factoids_g_truth"
-TOKEN_COL = "cumul_lead_paragraph_observation_date_tokenc"
+DATA_PATH = project_root / eval_output_dataset_path
+#PREDICTED_COL_TEMPLATE = "cumul_factoids_{}"
+PREDICTED_COL_TEMPLATE = f"{column_name_factoids_extracted}_{{}}"
+GOLD_COL = column_name_factoids_ground_truth
+TOKEN_COL = column_name_factoids_prompt_tokenc
 
 # Analysis parameters
 SIMILARITY_THRESHOLD = 0.7
 MAX_SAMPLES = None  # Set to None for all samples, or integer for limit
 
 # Output configuration - specific to factoids
-OUTPUT_JSON = project_root / "evaluation" / "exhaustivity_factoids_results.json"
-OUTPUT_PLOT_PNG = project_root / "evaluation" / "exhaustivity_factoids_plot_publication.png"
-OUTPUT_PLOT_PDF = project_root / "evaluation" / "exhaustivity_factoids_plot_publication.pdf"
+OUTPUT_JSON = project_root / eval_output_results_path / "exhaustivity_factoids_results.json"
+OUTPUT_PLOT_PNG = project_root / eval_output_results_path / "exhaustivity_factoids_plot_publication.png"
+OUTPUT_PLOT_PDF = project_root / eval_output_results_path / "exhaustivity_factoids_plot_publication.pdf"
 
 # Cache configuration for gold truth embeddings
-GOLD_EMBEDDINGS_CACHE = project_root / "evaluation" / "gold_factoids_embeddings_cache.pkl"
+GOLD_EMBEDDINGS_CACHE = project_root / eval_output_results_path / "gold_factoids_embeddings_cache.pkl"
 
 # Publication-quality plot settings
 FIGURE_WIDTH = 4.8  # inches (wider to accommodate right-side legend)
@@ -77,24 +88,21 @@ FIGURE_HEIGHT = 2.8  # inches (maintain good aspect ratio)
 DPI = 300
 
 # Models for publication plot (all available models)
-PUBLICATION_MODELS = ['claude', 'gpt4o', 'mistral', 'o3mini', 'gpt41']
+PUBLICATION_MODELS = eval_model_postfixes_to_plot_list
 
 # Publication color palette (colorblind-friendly)
 COLORS = {
-    'claude': '#1f77b4',    # Blue
-    'gpt4o': '#ff7f0e',     # Orange  
-    'mistral': '#2ca02c',   # Green
-    'o3mini': '#d62728',    # Red
-    'gpt41': '#9467bd'      # Purple
+    'llamacpp_gemma4': '#1f77b4',    # Blue
+    'ollama_gemma4': '#ff7f0e',     # Orange  
+    # 'mistral': '#2ca02c',   # Green
+    # 'o3mini': '#d62728',    # Red
+    # 'gpt41': '#9467bd'      # Purple
 }
 
 # Precise model names for legend display
 MODEL_DISPLAY_NAMES = {
-    'claude': 'claude-sonnet-4-20250514',
-    'gpt4o': 'gpt-4o-2024-11-20',
-    'mistral': 'mistral-large-latest',
-    'o3mini': 'o3-mini-2025-01-31',
-    'gpt41': 'gpt-4.1-2025-04-14'
+    'llamacpp_gemma4': 'llama.cpp-gemma4-e4b',
+    'ollama_gemma4': 'ollama-gemma4-e4b',
 }
 
 # Font sizes for publication
@@ -109,6 +117,24 @@ FONT_SIZES = {
 # ============================================================================
 # CORE FUNCTIONS
 # ============================================================================
+
+def normalize_factoid_list(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    if isinstance(value, str):
+        try:
+            parsed = ast.literal_eval(value)
+            if isinstance(parsed, list):
+                return parsed
+        except Exception:
+            pass
+        return [value]
+    if pd.isna(value):
+        return []
+    return [value]
+
 
 async def compute_and_cache_gold_embeddings(df, lg_kg_construction, force_recalculate=False):
     """
@@ -153,7 +179,9 @@ async def compute_and_cache_gold_embeddings(df, lg_kg_construction, force_recalc
     logger.info("Computing and caching gold truth factoids embeddings")
     
     # Filter valid rows (same logic as in main evaluation)
-    valid_indices = (df[GOLD_COL].notna() & df[TOKEN_COL].notna())
+    valid_indices = (df[GOLD_COL].notna() 
+                     #& df[TOKEN_COL].notna()
+                     )
     valid_df = df[valid_indices].copy()
     
     print(f"   📊 Processing {len(valid_df)} rows with valid gold factoids")
@@ -175,7 +203,7 @@ async def compute_and_cache_gold_embeddings(df, lg_kg_construction, force_recalc
         batch_factoid_counts = []
         
         for idx in batch_indices:
-            gold_factoids = valid_df[GOLD_COL].loc[idx]
+            gold_factoids = normalize_factoid_list(valid_df[GOLD_COL].loc[idx])
             if gold_factoids:
                 gold_texts = [str(gf) for gf in gold_factoids]
                 batch_gold_texts.extend(gold_texts)
@@ -209,7 +237,7 @@ async def compute_and_cache_gold_embeddings(df, lg_kg_construction, force_recalc
                 'timestamp': datetime.now().isoformat(),
                 'data_path': str(DATA_PATH),
                 'total_rows': len(embeddings_cache),
-                'embedding_model': 'text-embedding-3-large'
+                'embedding_model': lg_kg_construction.embeddings_model.__class__.__name__
             }
         }
         
@@ -264,28 +292,31 @@ async def find_matches_factoids_optimized(factoids, gold_factoids, lg_kg_constru
         if not text or not isinstance(text, str):
             return []
         
+        dates = []
+        
+        # Heuristic 1: Fast Regex for ISO Normalized Dates (e.g., '2003-01-09' or '2019-12')
+        iso_matches = re.findall(r'\b\d{4}-\d{2}-\d{2}\b|\b\d{4}-\d{2}\b', text)
+        for match in iso_matches:
+            try:
+                parsed_date = dateparser.parse(match)
+                if parsed_date:
+                    dates.append(parsed_date.date())
+            except (ValueError, TypeError):
+                continue
+        
+        # Heuristic 2: Use native dateparser token searching instead of manual sliding windows
         try:
-            # Find all potential date expressions in the text
-            dates = []
-            
-            # Use dateparser to find temporal expressions
-            # Split text into words and try to parse temporal expressions
-            words = text.split()
-            for i in range(len(words)):
-                for j in range(i+1, min(i+10, len(words)+1)):  # Check up to 10-word phrases
-                    phrase = ' '.join(words[i:j])
-                    try:
-                        parsed_date = dateparser.parse(phrase, settings={'PREFER_DAY_OF_MONTH': 'first'})
-                        if parsed_date:
-                            dates.append(parsed_date.date())
-                    except (ValueError, TypeError, AttributeError):
+            found_chunks = search_dates(text, settings={'PREFER_DAY_OF_MONTH': 'first'})
+            if found_chunks:
+                for text_match, date_obj in found_chunks:
+                    # Filter out false-positive short numbers parsed as relative days/months
+                    if text_match.isdigit() and int(text_match) < 1000:
                         continue
-            
-            # Remove duplicates and return
-            return list(set(dates))
+                    dates.append(date_obj.date())
         except Exception as e:
-            logger.debug(f"Error extracting temporal info from '{text}': {e}")
-            return []
+            logger.debug(f"Error natively searching dates in '{text}': {e}")
+            
+        return list(set(dates))
     
     # Factoids are already text strings
     factoid_texts = [str(f) for f in factoids]
@@ -321,44 +352,35 @@ async def find_matches_factoids_optimized(factoids, gold_factoids, lg_kg_constru
     temporal_matched_gold_indices = set()
     
     def temporal_lists_overlap(pred_dates, gold_dates):
-        """Check if any dates from predicted factoid overlap with gold factoid dates"""
         if not pred_dates and not gold_dates:
-            return True  # Both have no temporal info
+            return True  # Neutral alignment: both lacked explicit time constraints
         if not pred_dates or not gold_dates:
-            return False  # One has temporal info, the other doesn't
-        
-        # Check if any predicted date matches any gold date
-        for pred_date in pred_dates:
-            for gold_date in gold_dates:
-                if pred_date == gold_date:
-                    return True
-        return False
+            return False  # Mismatch: one isolated a time window, the other missed it
+        return bool(set(pred_dates) & set(gold_dates))
+
+    # --- HUNGARIAN ALGORITHM OPTIMAL ALIGNMENT ---
+    # linear_sum_assignment minimizes cost. To maximize similarity, cost = -similarity
+    cost_matrix = -similarity_matrix
+    pred_indices, gold_indices = linear_sum_assignment(cost_matrix)
     
-    # Process each predicted factoid
-    for i, factoid in enumerate(factoids):
-        similarities = similarity_matrix[i]
-        max_similarity_idx = np.argmax(similarities)
-        max_similarity = similarities[max_similarity_idx]
+    # Evaluate assignments against your chosen threshold criteria
+    for pred_idx, gold_idx in zip(pred_indices, gold_indices):
+        similarity_score = similarity_matrix[pred_idx, gold_idx]
         
-        if max_similarity > threshold:
-            # Track which gold factoid was matched (avoid double-counting)
-            matched_gold_indices.add(max_similarity_idx)
-            matched_gold = gold_factoids[max_similarity_idx]
+        if similarity_score >= threshold:
+            matched_gold_indices.add(gold_idx)
             
-            # Check temporal similarity by extracting dates from text
-            pred_temporal_dates = extract_temporal_info_from_text(factoid)
-            gold_temporal_dates = extract_temporal_info_from_text(matched_gold)
+            # Analyze temporal overlap for the aligned pair
+            pred_temporal_dates = extract_temporal_info_from_text(factoids[pred_idx])
+            gold_temporal_dates = extract_temporal_info_from_text(gold_factoids[gold_idx])
             
             if temporal_lists_overlap(pred_temporal_dates, gold_temporal_dates):
-                temporal_matched_gold_indices.add(max_similarity_idx)
-    
-    # Calculate recall metrics based on unique gold factoids matched
+                temporal_matched_gold_indices.add(gold_idx)
+                
+    # Calculate Recall Metrics
     total_gold = len(gold_factoids)
-    unique_gold_matches = len(matched_gold_indices)
-    unique_temporal_gold_matches = len(temporal_matched_gold_indices)
-    
-    recall = unique_gold_matches / total_gold if total_gold > 0 else 0.0
-    recall_t = unique_temporal_gold_matches / total_gold if total_gold > 0 else 0.0
+    recall = len(matched_gold_indices) / total_gold if total_gold > 0 else 0.0
+    recall_t = len(temporal_matched_gold_indices) / total_gold if total_gold > 0 else 0.0
     
     return {'recall': recall, 'recall_t': recall_t}
 
@@ -397,8 +419,9 @@ async def evaluate_models_by_token_count(df, model_names, lg_kg_construction, th
             
         # Filter valid rows
         valid_indices = (df[predicted_col].notna() & 
-                        df[GOLD_COL].notna() & 
-                        df[TOKEN_COL].notna())
+                        df[GOLD_COL].notna() 
+                        #& df[TOKEN_COL].notna()
+                        )
         valid_df = df[valid_indices].copy()
         
         if max_samples:
@@ -416,8 +439,8 @@ async def evaluate_models_by_token_count(df, model_names, lg_kg_construction, th
         for row_idx, idx in enumerate(valid_df.index):
             if row_idx % 10 == 0:  # Log progress every 10 rows
                 logger.debug(f"Processing row {row_idx + 1}/{len(valid_df)} for {model_name}")
-            factoids = valid_df[predicted_col].loc[idx]
-            gold_factoids = valid_df[GOLD_COL].loc[idx]
+            factoids = normalize_factoid_list(valid_df[predicted_col].loc[idx])
+            gold_factoids = normalize_factoid_list(valid_df[GOLD_COL].loc[idx])
             token_count = valid_df[TOKEN_COL].loc[idx]
             
             if not factoids or not gold_factoids:
@@ -504,18 +527,64 @@ def create_publication_exhaustivity_plot(results, model_names=None):
     
     df_plot = pd.DataFrame(plot_data)
     logger.info(f"Prepared plot data with {len(df_plot)} data points")
+
+
+    min_tc = df_plot['token_count'].min()
+    max_tc = df_plot['token_count'].max()
+    num_unique = df_plot['token_count'].nunique()
+
+    # Helper function for pretty human-readable numbers (e.g., 1500 -> 1.5k)
+    def format_val(val):
+        if val >= 1000:
+            return f"{val/1000:.1f}k"
+        return f"{int(round(val))}"
     
-    # Group by token count and calculate means
-    grouped = df_plot.groupby(['token_count', 'model']).agg({
+    if num_unique <= 1 or min_tc == max_tc:
+        # Fallback if there's only 1 data point or all token counts are completely identical
+        bin_label = format_val(min_tc) if not pd.isna(min_tc) else "0"
+        df_plot['token_bins'] = bin_label
+        unique_bins = [bin_label]
+    else:
+        # Determine appropriate number of bins (max 10 bins, or fewer if there are very few unique records)
+        num_bins = min(10, num_unique)
+        
+        # Calculate exactly spaced edges to wrap our specific data range cleanly
+        edges = np.linspace(min_tc, max_tc, num_bins + 1)
+        edges[0] -= 1   # Extend lower boundary slightly to guarantee inclusion of min_tc
+        edges[-1] += 1  # Extend upper boundary slightly to guarantee inclusion of max_tc
+        
+        # Build clean interval labels dynamically matching the exact spans
+        labels = []
+        for i in range(num_bins):
+            start = min_tc + i * (max_tc - min_tc) / num_bins
+            end = min_tc + (i + 1) * (max_tc - min_tc) / num_bins
+            labels.append(f"{format_val(start)}-{format_val(end)}")
+            
+        df_plot['token_bins'] = pd.cut(df_plot['token_count'], bins=edges, labels=labels)
+        unique_bins = labels
+
+    # Group by the adaptive bins instead of individual integers
+    grouped = df_plot.groupby(['token_bins', 'model'], observed=False).agg({
         'recall': 'mean',
         'recall_t': 'mean'
     }).reset_index()
     
+    # # Group by token count and calculate means
+    # grouped = df_plot.groupby(['token_count', 'model']).agg({
+    #     'recall': 'mean',
+    #     'recall_t': 'mean'
+    # }).reset_index()
+    
     # Get unique token counts and sort them - reduce density for publication
-    unique_tokens = sorted(grouped['token_count'].unique())
-    # Show every 3rd token count to reduce clutter and improve readability
-    unique_tokens_reduced = unique_tokens[::3]
-    logger.info(f"Plotting {len(unique_tokens_reduced)} token count points (reduced from {len(unique_tokens)})")
+    # unique_tokens = sorted(grouped['token_count'].unique())
+    # # Only reduce density if there are many unique token counts (e.g., more than 10)
+    # if len(unique_tokens) > 10:
+    #     # Show every 3rd token count to reduce clutter and improve readability
+    #     unique_tokens_reduced = unique_tokens[::3]
+    #     logger.info(f"Plotting {len(unique_tokens_reduced)} token count points (reduced from {len(unique_tokens)})")
+    # else:
+    #     unique_tokens_reduced = unique_tokens
+    #     logger.info(f"Plotting all {len(unique_tokens_reduced)} token count points")
     
     n_models = len([m for m in model_names if m in results])
     
@@ -523,7 +592,7 @@ def create_publication_exhaustivity_plot(results, model_names=None):
     fig, ax = plt.subplots(figsize=(FIGURE_WIDTH, FIGURE_HEIGHT), dpi=DPI)
     
     # Set up bar positions
-    x = np.arange(len(unique_tokens_reduced))
+    x = np.arange(len(unique_bins))
     width = 0.12  # Slightly reduced bar width to prevent touching
     
     # Plot bars for each model
@@ -532,13 +601,13 @@ def create_publication_exhaustivity_plot(results, model_names=None):
         if model_name not in results:
             continue
             
-        model_data = grouped[grouped['model'] == model_name]
+        model_data = grouped[grouped['model'] == model_name.lower()]
         
         recalls = []
         recalls_t = []
         
-        for token_count in unique_tokens_reduced:
-            token_data = model_data[model_data['token_count'] == token_count]
+        for bin_name in unique_bins:
+            token_data = model_data[model_data['token_bins'] == bin_name]
             if len(token_data) > 0:
                 recalls.append(token_data['recall'].iloc[0])
                 recalls_t.append(token_data['recall_t'].iloc[0])
@@ -576,10 +645,10 @@ def create_publication_exhaustivity_plot(results, model_names=None):
     ax.set_title('Exhaustivity of atomic facts', fontsize=FONT_SIZES['title'], fontweight='bold', pad=20)
     
     # Set y-axis range [0, 0.6] as requested
-    ax.set_ylim(0, 0.6)
+    ax.set_ylim(0, 1.0)
     
     # Add horizontal gridlines at specified intervals (improved visibility)
-    gridlines = [0.1, 0.2, 0.3, 0.4, 0.5]
+    gridlines = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     for gridline in gridlines:
         ax.axhline(y=gridline, color='gray', linestyle='-', alpha=0.4, linewidth=0.6, zorder=1)
     
@@ -590,20 +659,11 @@ def create_publication_exhaustivity_plot(results, model_names=None):
     # Set x-axis with improved readability
     ax.set_xticks(x)
     
-    # Format x-axis labels with scientific notation for readability
-    def format_token_count(tc):
-        if tc >= 10000:
-            return f'{tc/1000:.1f}k'
-        elif tc >= 1000:
-            return f'{tc/1000:.1f}k'
-        else:
-            return f'{int(tc)}'
-    
-    ax.set_xticklabels([format_token_count(tc) for tc in unique_tokens_reduced], 
+    ax.set_xticklabels(unique_bins, 
                        rotation=45, ha='right', fontsize=FONT_SIZES['tick_labels'])
     
     # Extend x-axis limits to use full plot width
-    ax.set_xlim(-0.5, len(unique_tokens_reduced) - 0.5)
+    ax.set_xlim(-0.5, len(unique_bins) - 0.5)
     
     # Create custom legend with single-column layout for right-side placement
     handles = []
@@ -789,7 +849,7 @@ async def main():
             
             # Import ATOM modules
             try:
-                from atom.llm_output_parsing.langchain_output_parser import LangchainOutputParser
+                from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
                 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
                 print("   ✅ ATOM modules imported successfully")
                 logger.info("ATOM modules imported successfully")
@@ -811,7 +871,7 @@ async def main():
                 
                 # Log dataset info
                 logger.info(f"Dataset columns: {list(df.columns)}")
-                logger.info(f"Available factoids models in dataset: {[col.replace('cumul_factoids_', '') for col in df.columns if col.startswith('cumul_factoids_') and col != GOLD_COL]}")
+                logger.info(f"Available factoids models in dataset: {[col.replace(f"{column_name_factoids_extracted}_", '') for col in df.columns if col.startswith(f"{column_name_factoids_extracted}_") and col != GOLD_COL]}")
             except Exception as e:
                 print(f"❌ Error loading data: {e}")
                 logger.error(f"Failed to load dataset: {e}")
@@ -821,25 +881,9 @@ async def main():
             print("🤖 Initializing language model components...")
             logger.info("Initializing language model components")
             try:
-                # API keys (same as in the working script)
-                openai_api_key = "###"
-                
-                openai_llm_model = ChatOpenAI(
-                    api_key=openai_api_key,
-                    model="o3-mini",
-                    max_tokens=None,
-                    timeout=None,
-                    max_retries=2,
-                )
-                
-                openai_embeddings_model = OpenAIEmbeddings(
-                    api_key=openai_api_key,
-                    model="text-embedding-3-large",
-                )
-                
                 lg_kg_construction = LangchainOutputParser(
-                    llm_model=openai_llm_model,
-                    embeddings_model=openai_embeddings_model
+                    llm_model=get_default_model(),
+                    embeddings_model=get_default_embedding_model()
                 )
                 print("   ✅ Language model components initialized")
                 logger.info("Language model components initialized successfully")

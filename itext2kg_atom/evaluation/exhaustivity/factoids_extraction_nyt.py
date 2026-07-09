@@ -20,6 +20,7 @@ import logging
 import time
 import json
 from pathlib import Path
+import argparse
 
 import pandas as pd
 import numpy as np
@@ -32,7 +33,12 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg.atom.models import AtomicFact
 
+from document_parser.parser_prompt import ParserPrompt
 from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    column_name_date, column_name_date_translated_paragraph, column_name_factoids_extracted, column_name_factoids_prompt_tokenc, doc_parser_batch_size, 
+    eval_input_dataset_path, eval_output_dataset_path, eval_checkpoint_factoids_path, eval_model_postfixes_list, num_rows_to_process
+)
 # from langchain_anthropic import ChatAnthropic
 
 
@@ -61,68 +67,24 @@ logger.info("Setting up API connections...")
 # Paths
 # INPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "nyt_news" / "2020_nyt_COVID_last_version_ready.pkl"
 # OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "nyt_news" / "2020_nyt_COVID_last_version_ready_factoids_llamacpp.pkl"
-INPUT_DATASET_PATH: Path =  project_root / "datasets" / "atom" / "my_test_datasets" / "dataset.pkl"
-OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "my_test_datasets" / "dataset_with_factoids.pkl"
+INPUT_DATASET_PATH: Path =  project_root / eval_input_dataset_path
+OUTPUT_DATASET_PATH: Path = project_root / eval_output_dataset_path
+NUM_ROWS_TO_PROCESS = num_rows_to_process
 
 # Column names
 # It could be used on the cumulative lead_paragraph_observation_date. You can change "lead_paragraph_observation_date" 
 # to "cumul_lead_paragraph_observation_date" if you want to use the cumulative lead_paragraph_observation_date.
-PARAGRAPHS_COL_NAME: str = "lead_paragraph_observation_date"
-FACTOIDS_COL_NAME: str = "factoids_llamacpp"
+DATA_COL = column_name_date
+PARAGRAPHS_COL_NAME: str = column_name_date_translated_paragraph
+FACTOIDS_COL_NAME: str = column_name_factoids_extracted
 
 # Sampling: number of uniformly spaced indices to process. Set to None or 0 to process all
 SAMPLER_K: int | None = None
 
 # Batch processing configuration
-BATCH_SIZE: int = 10  # Process 5 contexts per batch
-CHECKPOINT_FILE: Path = project_root / "datasets" / "atom" / "nyt_news" / "factoids_checkpoint.json"
+BATCH_SIZE: int = doc_parser_batch_size
+CHECKPOINT_FILE: Path = project_root / eval_checkpoint_factoids_path
 
-# mistral_api_key = "###"
-# mistral_llm_model = ChatMistralAI(
-#     api_key = mistral_api_key,
-#     model="mistral-large-latest",
-#     temperature=0,
-#     max_retries=2,
-# )
-
-
-# mistral_embeddings_model = MistralAIEmbeddings(
-#     model="mistral-embed",
-#     api_key = mistral_api_key
-# )
-
-
-openai_api_key = "###"
-#gpt-4o-2024-11-20
-#gpt-4.1-2025-04-14
-#o3-mini-2025-01-31
-#gpt-4-turbo-2024-04-09
-
-openai_llm_model = ChatOpenAI(
-    api_key = openai_api_key,
-    model="gpt-4.1-2025-04-14",  # Better structured output support
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
-)
-
-# claude_api_key = "###"
-
-# claude_llm_model = ChatAnthropic(
-#     api_key= claude_api_key,
-#     model="claude-sonnet-4-20250514",
-#     temperature=0,
-#     timeout=None,
-#     max_tokens=64000,
-#     max_retries=2,
-# )
-
-
-openai_embeddings_model = OpenAIEmbeddings(
-    api_key = openai_api_key ,
-    model="text-embedding-3-large",
-)
 
 # --- Local / Native Llama.cpp Server --------------------------------------
 model_llamacpp_gemma4 = get_default_model()
@@ -138,6 +100,8 @@ logger.info("✅ LangchainOutputParser initialized successfully")
 
 print("📊 Loading dataset...")
 df_nyt = pd.read_pickle(INPUT_DATASET_PATH)
+if num_rows_to_process > 0:
+    df_nyt = df_nyt.head(num_rows_to_process)
 logger.info(f"📋 Loaded dataset with {len(df_nyt)} rows")
 
 def load_checkpoint() -> dict:
@@ -187,7 +151,7 @@ async def extract_factoid_batch(contexts: list[str]) -> list[list[str]]:
     logger.info(f"🔍 Starting factoid extraction for batch of {len(contexts)} contexts...")
     
     atomic_facts = await lg_kg_construction.extract_information_as_json_for_context(
-        AtomicFact, contexts
+        AtomicFact, contexts, ParserPrompt._create_temporal_system_query("2000-01-01")
     )
     
     logger.info(f"✅ Extracted {len(atomic_facts)} atomic fact objects")
@@ -207,9 +171,27 @@ async def extract_factoid_batch(contexts: list[str]) -> list[list[str]]:
     
     return results[:len(contexts)]
 
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Extract factoids from raw news paragraphs - Factoids Analysis')
+    parser.add_argument('--model-postfix', '-p', type=str, required=True,
+                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
+    return parser.parse_args()
 
 async def main():
     start_time = time.time()
+
+    # Parse command line arguments
+    args = parse_arguments()
+
+    if not args.model_postfix:
+        logger.error('--model-postfix arg not provided')
+        return
+    if args.model_postfix not in eval_model_postfixes_list:
+        logger.error(f'Unsupported --model-postfix arg. Supported ones are: {eval_model_postfixes_list}')
+        return
+    
+    factoids_col_with_postfix = f"{FACTOIDS_COL_NAME}_{args.model_postfix}"
     
     try:
         print("🎯 Starting main extraction process...")
@@ -232,14 +214,14 @@ async def main():
         logger.info(f"📦 Created {len(batches)} batches of size {BATCH_SIZE}")
 
         # Initialize the results column if not exists
-        if FACTOIDS_COL_NAME not in df_nyt.columns:
-            df_nyt[FACTOIDS_COL_NAME] = None
+        if factoids_col_with_postfix not in df_nyt.columns:
+            df_nyt[factoids_col_with_postfix] = None
 
         # Load existing results from checkpoint
         for idx_str, result in checkpoint.get("results", {}).items():
             idx = int(idx_str)
             if idx < len(df_nyt):
-                df_nyt.at[df_nyt.index[idx], FACTOIDS_COL_NAME] = result
+                df_nyt.at[df_nyt.index[idx], factoids_col_with_postfix] = result
 
         # Process batches
         for batch_idx, batch_indices in enumerate(batches):
@@ -257,7 +239,7 @@ async def main():
             
             # Store results in dataframe and checkpoint
             for idx, result in zip(batch_indices, batch_results):
-                df_nyt.at[df_nyt.index[idx], FACTOIDS_COL_NAME] = result
+                df_nyt.at[df_nyt.index[idx], factoids_col_with_postfix] = result
                 checkpoint["results"][str(idx)] = result
             
             # Mark batch as completed and save checkpoint
@@ -266,9 +248,21 @@ async def main():
             
             logger.info(f"✅ Batch {batch_idx + 1}/{len(batches)} completed and saved")
 
-        # Save final results
+        # Compute token count for each row
+        df_nyt[column_name_factoids_prompt_tokenc] = [
+            lg_kg_construction.count_tokens(f"# Context: {txt}\n\n# Question: {ParserPrompt._create_temporal_system_query(date.strftime('%Y-%m-%d'))}\n\nAnswer: ")
+            for txt, date in zip(df_nyt[PARAGRAPHS_COL_NAME], df_nyt[DATA_COL])
+        ]
+
+        # Save final results (do not overwrite the whole output dataset, just merge new columns)
         print(f"💾 Saving final results to: {OUTPUT_DATASET_PATH}")
-        df_nyt.to_pickle(OUTPUT_DATASET_PATH)
+        if Path.exists(OUTPUT_DATASET_PATH):
+            df_out_existing = pd.read_pickle(OUTPUT_DATASET_PATH)
+            df_out_existing[factoids_col_with_postfix] = df_nyt[factoids_col_with_postfix]
+            df_out_existing[column_name_factoids_prompt_tokenc] = df_nyt[column_name_factoids_prompt_tokenc]
+            df_out_existing.to_pickle(OUTPUT_DATASET_PATH)
+        else:
+            df_nyt.to_pickle(OUTPUT_DATASET_PATH)
         
         # Clean up checkpoint file
         if CHECKPOINT_FILE.exists():

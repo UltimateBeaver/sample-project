@@ -13,6 +13,7 @@ Output:
     - JSON file with the results
 """
 
+import ast
 import asyncio
 import json
 import logging
@@ -26,6 +27,12 @@ from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
 import sys
 from pathlib import Path
+
+from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    column_name_quintuples_ground_truth, column_name_quintuples_extracted, column_name_quintuples_prompt_tokenc,
+    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list, eval_model_postfixes_to_plot_list
+)
 
 # Add the project root to Python path (same pattern as exhaustivity_evaluation_nyt.py)
 current_file = Path(__file__).resolve()
@@ -50,22 +57,22 @@ logger.info("Setting up configuration and API connections...")
 # ============================================================================
 
 # Models to evaluate (all available models - will be filtered for publication quality in plotting)
-MODEL_NAMES = ['claude', 'gpt4o', 'mistral', 'o3mini', 'gpt41']
+MODEL_NAMES = eval_model_postfixes_list
 
 # Data configuration
-DATA_PATH = project_root / "datasets" / "nyt_news" / "subset_2020_nyt_COVID_final.pkl"
-PREDICTED_COL_TEMPLATE = "cumul_quintuples_{}"
-GOLD_COL = "cumul_quintuples_g_truth"
-TOKEN_COL = "cumul_lead_paragraph_observation_date_tokenc"
+DATA_PATH = project_root / eval_output_dataset_path
+PREDICTED_COL_TEMPLATE = f"{column_name_quintuples_extracted}_{{}}"
+GOLD_COL = column_name_quintuples_ground_truth
+TOKEN_COL = column_name_quintuples_prompt_tokenc
 
 # Analysis parameters
 SIMILARITY_THRESHOLD = 0.7
 MAX_SAMPLES = None  # Set to None for all samples, or integer for limit
 
 # Output configuration
-OUTPUT_JSON = project_root / "evaluation" / "exhaustivity_results.json"
-OUTPUT_PLOT_PNG = project_root / "evaluation" / "exhaustivity_plot_publication.png"
-OUTPUT_PLOT_PDF = project_root / "evaluation" / "exhaustivity_plot_publication.pdf"
+OUTPUT_JSON = project_root / eval_output_results_path / "exhaustivity_quintuples_results.json"
+OUTPUT_PLOT_PNG = project_root / eval_output_results_path / "exhaustivity_quintuples_plot_publication.png"
+OUTPUT_PLOT_PDF = project_root / eval_output_results_path / "exhaustivity_quintuples_plot_publication.pdf"
 
 # Publication-quality plot settings
 FIGURE_WIDTH = 4.8  # inches (wider to accommodate right-side legend)
@@ -73,24 +80,21 @@ FIGURE_HEIGHT = 2.8  # inches (maintain good aspect ratio)
 DPI = 300
 
 # Models for publication plot (all available models)
-PUBLICATION_MODELS = ['claude', 'gpt4o', 'mistral', 'o3mini', 'gpt41']
+PUBLICATION_MODELS = eval_model_postfixes_to_plot_list
 
 # Publication color palette (colorblind-friendly)
 COLORS = {
-    'claude': '#1f77b4',    # Blue
-    'gpt4o': '#ff7f0e',     # Orange  
-    'mistral': '#2ca02c',   # Green
-    'o3mini': '#d62728',    # Red
-    'gpt41': '#9467bd'      # Purple
+    'llamacpp_gemma4': '#1f77b4',    # Blue
+    'ollama_gemma4': '#ff7f0e',     # Orange   
+    # 'mistral': '#2ca02c',   # Green
+    # 'o3mini': '#d62728',    # Red
+    # 'gpt41': '#9467bd'      # Purple
 }
 
 # Precise model names for legend display
 MODEL_DISPLAY_NAMES = {
-    'claude': 'claude-sonnet-4-20250514',
-    'gpt4o': 'gpt-4o-2024-11-20',
-    'mistral': 'mistral-large-latest',
-    'o3mini': 'o3-mini-2025-01-31',
-    'gpt41': 'gpt-4.1-2025-04-14'
+    'llamacpp_gemma4': 'llama.cpp-gemma4-e4b',
+    'ollama_gemma4': 'ollama-gemma4-e4b',
 }
 
 # Font sizes for publication (increased as requested)
@@ -105,6 +109,47 @@ FONT_SIZES = {
 # ============================================================================
 # CORE FUNCTIONS
 # ============================================================================
+
+def normalize_quintuples_list(value):
+    """
+    Normalizes a pandas cell value into a list of quintuples (5-tuples).
+    Handles raw lists/tuples, stringified representations, and missing data.
+    """
+    #parsed = value
+
+    # Convert string representation to Python objects
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value in ('[]', '()'):
+            return []
+        try:
+            value = ast.literal_eval(value)
+        except Exception:
+            return []
+    
+    # If it's a NumPy array, convert it to a standard Python list
+    if type(value).__name__ == 'ndarray':
+        value = value.tolist()
+
+    if isinstance(value, (list, tuple)):
+        if len(value) == 0:
+            return []
+
+        # Edge Case: Single quintuple passed directly
+        if len(value) == 5 and isinstance(value[0], str):
+            return [tuple(value)]
+
+        # Standard Case: Extract valid 5-tuples
+        normalized = []
+        for item in value:
+            if isinstance(item, (list, tuple)) and len(item) == 5:
+                normalized.append(tuple(item))
+        return normalized
+
+    if pd.isna(value):
+        return []
+    # Catch-all fallback for unexpected types
+    return []
 
 async def find_matches_quintuples_optimized(quintuples, gold_quintuples, lg_kg_construction, threshold=0.7):
     """
@@ -256,8 +301,8 @@ async def evaluate_models_by_token_count(df, model_names, lg_kg_construction, th
         for row_idx, idx in enumerate(valid_df.index):
             if row_idx % 10 == 0:  # Log progress every 10 rows
                 logger.debug(f"Processing row {row_idx + 1}/{len(valid_df)} for {model_name}")
-            quintuples = valid_df[predicted_col].loc[idx]
-            gold_quintuples = valid_df[GOLD_COL].loc[idx]
+            quintuples = normalize_quintuples_list(valid_df[predicted_col].loc[idx])
+            gold_quintuples = normalize_quintuples_list(valid_df[GOLD_COL].loc[idx])
             token_count = valid_df[TOKEN_COL].loc[idx]
             
             if not quintuples or not gold_quintuples:
@@ -487,7 +532,7 @@ def create_publication_exhaustivity_plot(results, model_names=None):
     logger.info("Quintuples plot improvements applied:")
     logger.info("  ✅ X-axis labels rotated 45° with scientific notation (k format)")
     logger.info("  ✅ X-axis limits extended to full plot width")
-    logger.info("  ✅ All 5 models included in legend (claude, gpt4o, mistral, o3mini, gpt41)")
+    #logger.info("  ✅ All 5 models included in legend (claude, gpt4o, mistral, o3mini, gpt41)")
     logger.info("  ✅ Horizontal gridlines added at 0.1-0.5 intervals")
     logger.info("  ✅ Font sizes optimized (axis: 13pt, ticks: 11pt, legend: 8pt)")
     logger.info("  ✅ Single-column legend positioned outside plot area (right side)")
@@ -666,25 +711,9 @@ async def main():
             print("🤖 Initializing language model components...")
             logger.info("Initializing language model components")
             try:
-                # API keys (same as in the working script)
-                openai_api_key = "###"
-                
-                openai_llm_model = ChatOpenAI(
-                    api_key=openai_api_key,
-                    model="o3-mini",
-                    max_tokens=None,
-                    timeout=None,
-                    max_retries=2,
-                )
-                
-                openai_embeddings_model = OpenAIEmbeddings(
-                    api_key=openai_api_key,
-                    model="text-embedding-3-large",
-                )
-                
                 lg_kg_construction = LangchainOutputParser(
-                    llm_model=openai_llm_model,
-                    embeddings_model=openai_embeddings_model
+                    llm_model=get_default_model(),
+                    embeddings_model=get_default_embedding_model()
                 )
                 print("   ✅ Language model components initialized")
                 logger.info("Language model components initialized successfully")

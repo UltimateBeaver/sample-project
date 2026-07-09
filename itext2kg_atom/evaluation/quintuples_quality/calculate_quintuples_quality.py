@@ -27,6 +27,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 import sys
 from pathlib import Path
 
+from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    column_name_quintuples_ground_truth, 
+    eval_input_dataset_path, eval_output_dataset_path, eval_checkpoint_factoids_path, eval_model_postfixes_list, num_rows_to_process
+)
+
 # Add the project root to Python path (same pattern as exhaustivity_evaluation_nyt.py)
 current_file = Path(__file__).resolve()
 project_root = current_file.parent.parent.parent
@@ -51,7 +57,7 @@ logger.info("Setting up configuration and API connections...")
 
 # Data configuration
 DATA_PATH = project_root / "datasets" / "nyt_news" / "2020_nyt_COVID_last_version_ready_quintuples_gpt41_from_factoids.pkl"
-GOLD_COL = "quintuples_g_truth"
+GOLD_COL = column_name_quintuples_ground_truth
 PREDICTED_COL_CASE1 = "quintuples_gpt41"
 PREDICTED_COL_CASE2 = "quintuples_gpt41_from_factoids"
 
@@ -610,7 +616,7 @@ async def main():
     try:
         # Import ATOM modules
         try:
-            from atom.llm_output_parsing.langchain_output_parser import LangchainOutputParser
+            from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
             from langchain_openai import ChatOpenAI, OpenAIEmbeddings
             print("   ✅ ATOM modules imported successfully")
             logger.info("ATOM modules imported successfully")

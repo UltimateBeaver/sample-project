@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-09T14:31:56.214522",
+    "model_names": [
+      "llamacpp_gemma4",
+      "ollama_gemma4"
+    ],
+    "similarity_threshold": 0.7,
+    "data_path": "C:\\Users\\Mauro\\Documents\\Andrea\\Tesi\\itext2kg_atom\\datasets\\atom\\my_test_datasets\\dataset_output.pkl",
+    "total_samples": 2
+  },
+  "results": {
+    "llamacpp_gemma4": [
+      {
+        "token_count": 759,
+        "recall": 0.25,
+        "recall_t": 0.25,
+        "row_idx": 0
+      },
+      {
+        "token_count": 771,
+        "recall": 0.3333333333333333,
+        "recall_t": 0.16666666666666666,
+        "row_idx": 1
+      }
+    ]
+  }
+}

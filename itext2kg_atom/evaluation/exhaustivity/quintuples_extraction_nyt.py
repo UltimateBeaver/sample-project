@@ -20,6 +20,7 @@ import logging
 import time
 import json
 from pathlib import Path
+import argparse
 
 import pandas as pd
 import numpy as np
@@ -37,6 +38,10 @@ sys.path.append(str(project_root))
 from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg.atom.models import RelationshipsExtractor, Prompt
 from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    column_name_quintuples_extracted_from_raw_text, column_name_date, column_name_date_translated_paragraph, column_name_quintuples_raw_prompt_tokenc,
+    eval_input_dataset_path, eval_output_dataset_path, num_rows_to_process, doc_parser_batch_size, eval_checkpoint_quintuples_path, eval_model_postfixes_list
+)
 
 # Configure logging
 logging.basicConfig(
@@ -55,67 +60,22 @@ logger.info("Setting up API connections...")
 # Global configuration vars
 # ==========================
 # Paths
-INPUT_DATASET_PATH: Path =  project_root / "datasets" / "atom" / "my_test_datasets" / "Annotazioni_1_with_factoids.pkl"
-OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "my_test_datasets" / "Annotazioni_1_with_quintuples.pkl"
+INPUT_DATASET_PATH: Path =  project_root / eval_input_dataset_path
+OUTPUT_DATASET_PATH: Path = project_root / eval_output_dataset_path
 
 # Column names
 # It could be used on the cumulative lead_paragraph_observation_date. You can change "lead_paragraph_observation_date" 
 # to "cumul_lead_paragraph_observation_date" if you want to use the cumulative lead_paragraph_observation_date.
-PARAGRAPHS_COL_NAME: str = "ARTICOLO"
-DATE_COL_NAME: str = "DATA"
-QUINTUPLES_COL_NAME: str = "quintuples_llamacpp"
+PARAGRAPHS_COL_NAME: str = column_name_date_translated_paragraph
+DATE_COL_NAME: str = column_name_date
+QUINTUPLES_COL_NAME: str = column_name_quintuples_extracted_from_raw_text
 
 # Sampling: number of uniformly spaced indices to process. Set to None or 0 to process all
 SAMPLER_K: int | None = None
 
 # Batch processing configuration
-BATCH_SIZE: int = 30 
-CHECKPOINT_FILE: Path = project_root / "datasets" / "atom" / "my_test_datasets" / "quintuples_checkpoint.json"
-
-# mistral_api_key = "###"
-# mistral_llm_model = ChatMistralAI(
-#     api_key = mistral_api_key,
-#     model="mistral-large-latest",
-#     temperature=0,
-#     max_retries=2,
-# )
-
-# mistral_embeddings_model = MistralAIEmbeddings(
-#     model="mistral-embed",
-#     api_key = mistral_api_key
-# )
-
-#openai_api_key = "###"
-#openai_api_key = "###"
-#gpt-4o-2024-11-20
-#gpt-4.1-2025-04-14
-#o3-mini-2025-01-31
-#gpt-4-turbo-2024-04-09
-
-# openai_llm_model = ChatOpenAI(
-#     api_key = openai_api_key,
-#     model="gpt-4.1-2025-04-14",  # Better structured output support
-#     #temperature=0,
-#     max_tokens=None,
-#     timeout=None,
-#     max_retries=2,
-# )
-
-# claude_api_key = "###"
-
-# claude_llm_model = ChatAnthropic(
-#     api_key= claude_api_key,
-#     model="claude-sonnet-4-20250514",
-#     temperature=0,
-#     timeout=None,
-#     max_tokens=64000,
-#     max_retries=2,
-# )
-
-# openai_embeddings_model = OpenAIEmbeddings(
-#     api_key = openai_api_key ,
-#     model="text-embedding-3-large",
-# )
+BATCH_SIZE: int = doc_parser_batch_size 
+CHECKPOINT_FILE: Path = project_root / eval_checkpoint_quintuples_path
 
 lg_kg_construction = LangchainOutputParser(
    llm_model=get_default_model(),
@@ -126,6 +86,8 @@ logger.info("✅ LangchainOutputParser initialized successfully")
 
 print("📊 Loading dataset...")
 df_nyt = pd.read_pickle(INPUT_DATASET_PATH)
+if num_rows_to_process > 0:
+    df_nyt = df_nyt.head(num_rows_to_process)
 logger.info(f"📋 Loaded dataset with {len(df_nyt)} rows")
 
 def load_checkpoint() -> dict:
@@ -231,8 +193,27 @@ async def extract_quintuples_batch(contexts: list[str], timestamps: list[str]) -
     logger.info(f"✅ Batch extraction completed: {total_quintuples} quintuples across {len(contexts)} contexts")
     return batch_results
 
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Extract factoids from raw news paragraphs - Factoids Analysis')
+    parser.add_argument('--model-postfix', '-p', type=str, required=True,
+                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
+    return parser.parse_args()
+
 async def main():
     start_time = time.time()
+
+    # Parse command line arguments
+    args = parse_arguments()
+
+    if not args.model_postfix:
+        logger.error('--model-postfix arg not provided')
+        return
+    if args.model_postfix not in eval_model_postfixes_list:
+        logger.error(f'Unsupported --model-postfix arg. Supported ones are: {eval_model_postfixes_list}')
+        return
+    
+    quintuples_col_with_postfix = f"{QUINTUPLES_COL_NAME}_{args.model_postfix}"
     
     try:
         print("🎯 Starting main extraction process...")
@@ -255,14 +236,14 @@ async def main():
         logger.info(f"📦 Created {len(batches)} batches of size {BATCH_SIZE}")
 
         # Initialize the results column if not exists
-        if QUINTUPLES_COL_NAME not in df_nyt.columns:
-            df_nyt[QUINTUPLES_COL_NAME] = None
+        if quintuples_col_with_postfix not in df_nyt.columns:
+            df_nyt[quintuples_col_with_postfix] = None
 
         # Load existing results from checkpoint
         for idx_str, result in checkpoint.get("results", {}).items():
             idx = int(idx_str)
             if idx < len(df_nyt):
-                df_nyt.at[df_nyt.index[idx], QUINTUPLES_COL_NAME] = result
+                df_nyt.at[df_nyt.index[idx], quintuples_col_with_postfix] = result
 
         # Process batches
         for batch_idx, batch_indices in enumerate(batches):
@@ -281,7 +262,7 @@ async def main():
             
             # Store results in dataframe and checkpoint
             for idx, result in zip(batch_indices, batch_results):
-                df_nyt.at[df_nyt.index[idx], QUINTUPLES_COL_NAME] = result
+                df_nyt.at[df_nyt.index[idx], quintuples_col_with_postfix] = result
                 checkpoint["results"][str(idx)] = result
             
             # Mark batch as completed and save checkpoint
@@ -290,9 +271,21 @@ async def main():
             
             logger.info(f"✅ Batch {batch_idx + 1}/{len(batches)} completed and saved")
 
-        # Save final results
+        # Compute token count for each row
+        df_nyt[column_name_quintuples_raw_prompt_tokenc] = [
+            lg_kg_construction.count_tokens(f"# Context: {txt}\n\n# Question: {Prompt.temporal_system_query(date.strftime('%Y-%m-%d') + Prompt.EXAMPLES.value)}\n\nAnswer: ")
+            for txt, date in zip(df_nyt[PARAGRAPHS_COL_NAME], df_nyt[DATE_COL_NAME])
+        ]
+
+        # Save final results (do not overwrite the whole output dataset, just merge new columns)
         print(f"💾 Saving final results to: {OUTPUT_DATASET_PATH}")
-        df_nyt.to_pickle(OUTPUT_DATASET_PATH)
+        if Path.exists(OUTPUT_DATASET_PATH):
+            df_out_existing = pd.read_pickle(OUTPUT_DATASET_PATH)
+            df_out_existing[quintuples_col_with_postfix] = df_nyt[quintuples_col_with_postfix]
+            df_out_existing[column_name_quintuples_raw_prompt_tokenc] = df_nyt[column_name_quintuples_raw_prompt_tokenc]
+            df_out_existing.to_pickle(OUTPUT_DATASET_PATH)
+        else:
+            df_nyt.to_pickle(OUTPUT_DATASET_PATH)
         
         # Clean up checkpoint file
         if CHECKPOINT_FILE.exists():

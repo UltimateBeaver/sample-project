@@ -20,6 +20,7 @@ import logging
 import time
 import ast
 from pathlib import Path
+import argparse
 
 import pandas as pd
 import numpy as np
@@ -29,11 +30,13 @@ current_file = Path(__file__).resolve()
 project_root = current_file.parent.parent.parent
 sys.path.append(str(project_root))
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-
 from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg.atom.models import RelationshipsExtractor, Prompt
 from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    column_name_quintuples_extracted, column_name_date, column_name_factoids_ground_truth, column_name_factoids_extracted, column_name_quintuples_prompt_tokenc, 
+    eval_input_dataset_path, eval_output_dataset_path, eval_model_postfixes_list, num_rows_to_process, num_rows_to_process
+)
 
 # Configure logging
 logging.basicConfig(
@@ -52,50 +55,18 @@ logger.info("Setting up API connections...")
 # Global configuration vars
 # ==========================
 # Paths
-INPUT_DATASET_PATH: Path =  project_root / "datasets" / "atom" / "my_test_datasets" / "Annotazioni_1_with_factoids.pkl"
-OUTPUT_DATASET_PATH: Path = project_root / "datasets" / "atom" / "my_test_datasets" / "Annotazioni_1_with_quintuples.pkl"
+INPUT_DATASET_PATH: Path =  project_root / eval_input_dataset_path
+OUTPUT_DATASET_PATH: Path = project_root / eval_output_dataset_path
+NUM_ROWS_TO_PROCESS = num_rows_to_process
 
 # Column names
-FACTOIDS_COL_NAME: str = "factoids_g_truth"
-DATE_COL_NAME: str = "DATA"
-QUINTUPLES_COL_NAME: str = "quintuples_llamacpp"
+FACTOIDS_COL_NAME: str = column_name_factoids_ground_truth
+FACTOIDS_EXTRACTED_COL_NAME: str = column_name_factoids_extracted
+DATE_COL_NAME: str = column_name_date
+QUINTUPLES_COL_NAME: str = column_name_quintuples_extracted
 
 # Sampling: number of uniformly spaced indices to process. Set to None or 0 to process all
 SAMPLER_K: int | None = None
-
-# mistral_api_key = "###"
-# mistral_llm_model = ChatMistralAI(
-#     api_key = mistral_api_key,
-#     model="mistral-large-latest",
-#     temperature=0,
-#     max_retries=2,
-# )
-
-
-# mistral_embeddings_model = MistralAIEmbeddings(
-#     model="mistral-embed",
-#     api_key = mistral_api_key
-# )
-
-#gpt-4o-2024-11-20
-#gpt-4.1-2025-04-14
-#o3-mini-2025-01-31
-#openai_api_key = "###"
-# openai_api_key = "###"
-
-# openai_llm_model = ChatOpenAI(
-#     api_key = openai_api_key,
-#     model="gpt-4.1-2025-04-14",
-#     temperature=0,
-#     max_tokens=None,
-#     timeout=None,
-#     max_retries=2,
-# )
-
-# openai_embeddings_model = OpenAIEmbeddings(
-#     api_key = openai_api_key ,
-#     model="text-embedding-3-large",
-# )
 
 lg_kg_construction = LangchainOutputParser(
    llm_model=get_default_model(),
@@ -106,6 +77,8 @@ logger.info("✅ LangchainOutputParser initialized successfully")
 
 print("📊 Loading dataset (only first row, for testing)...")
 df_nyt = pd.read_pickle(INPUT_DATASET_PATH)
+if num_rows_to_process > 0:
+    df_nyt = df_nyt.head(num_rows_to_process)
 logger.info(f"📋 Loaded dataset with {len(df_nyt)} rows")
 
 def _uniform_indices(num_rows: int, k: int | None) -> list[int]:
@@ -191,10 +164,28 @@ async def extract_quintuples(contexts: list[list[str]], timestamps: list[str]) -
     return all_results
 
 
-
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Extract factoids from raw news paragraphs - Factoids Analysis')
+    parser.add_argument('--model-postfix', '-p', type=str, required=True,
+                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
+    return parser.parse_args()
 
 async def main():
     start_time = time.time()
+
+    # Parse command line arguments
+    args = parse_arguments()
+
+    if not args.model_postfix:
+        logger.error('--model-postfix arg not provided')
+        return
+    if args.model_postfix not in eval_model_postfixes_list:
+        logger.error(f'Unsupported --model-postfix arg. Supported ones are: {eval_model_postfixes_list}')
+        return
+    
+    quintuples_col_with_postfix = f"{QUINTUPLES_COL_NAME}_{args.model_postfix}"
+    #factoids_extracted_col_with_postfix = f"{FACTOIDS_EXTRACTED_COL_NAME}_{args.model_postfix}"
     
     try:
         print("🎯 Starting main extraction process...")
@@ -214,13 +205,25 @@ async def main():
 
         # Initialize column with empty values, then fill only selected indices
         empty_value = None
-        df_nyt[QUINTUPLES_COL_NAME] = empty_value
+        df_nyt[quintuples_col_with_postfix] = empty_value
         for idx, value in zip(selected_indices, extracted):
-            df_nyt.at[df_nyt.index[idx], QUINTUPLES_COL_NAME] = value
+            df_nyt.at[df_nyt.index[idx], quintuples_col_with_postfix] = value
+
+        # Compute token count for each row
+        df_nyt[column_name_quintuples_prompt_tokenc] = [
+            lg_kg_construction.count_tokens(f"# Context: {txt}\n\n# Question: {Prompt.temporal_system_query(date.strftime('%Y-%m-%d') + Prompt.EXAMPLES.value)}\n\nAnswer: ")
+            for txt, date in zip(df_nyt[FACTOIDS_COL_NAME], df_nyt[DATE_COL_NAME])
+        ]
         
-        # Save results
-        print(f"💾 Saving results to: {OUTPUT_DATASET_PATH}")
-        df_nyt.to_pickle(OUTPUT_DATASET_PATH)
+        # Save final results (do not overwrite the whole output dataset, just merge new columns)
+        print(f"💾 Saving final results to: {OUTPUT_DATASET_PATH}")
+        if Path.exists(OUTPUT_DATASET_PATH):
+            df_out_existing = pd.read_pickle(OUTPUT_DATASET_PATH)
+            df_out_existing[quintuples_col_with_postfix] = df_nyt[quintuples_col_with_postfix]
+            df_out_existing[column_name_quintuples_prompt_tokenc] = df_nyt[column_name_quintuples_prompt_tokenc]
+            df_out_existing.to_pickle(OUTPUT_DATASET_PATH)
+        else:
+            df_nyt.to_pickle(OUTPUT_DATASET_PATH)
         
         elapsed_time = time.time() - start_time
         logger.info(f"🎉 Processing completed successfully in {elapsed_time:.2f} seconds!")
