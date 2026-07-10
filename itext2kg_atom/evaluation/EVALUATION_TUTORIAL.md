@@ -2,11 +2,12 @@
 
 ## Initial setup
 
-All the scripts have been configure to read environment variables stored in [.env](../../.env) (check out [env_config.py](../../env_config.py) for default values) and an input dataset in pickle format `../datasets/atom/my_test_datasets/dataset_input.pkl`. The input dataset is expected to have the following columns:
+All the scripts have been configured to read environment variables stored in [.env](../../.env) (check out [env_config.py](../../env_config.py) for default values) and an input dataset in pickle format `../datasets/atom/my_test_datasets/dataset_input.pkl`. The input dataset is expected to have the following columns:
 
 - COLUMN_NAME_DATE: the observation date of the news paragraph
 - COLUMN_NAME_DATE_TRANSLATED_PARAGRAPH: the observation date plus the news paragraph in English
-- COLUMN_NAME_FACTOIDS_GROUND_TRUTH: the ground truth extracted factoids (aka AtomicFacts) as a list of strings for each dataset row
+- COLUMN_NAME_FACTOIDS_GROUND_TRUTH: the ground truth factoids (aka AtomicFacts) as a list of strings, for each dataset row
+- COLUMN_NAME_QUINTUPLES_GROUND_TRUTH: the ground truth quintuples as a list of tuples (Subject_entity, Relation, Object_entity, Time_Start, Time_End), for each dataset row
   Make sure you have the following env variables correctly setup before proceeding:
 
 ```bash
@@ -89,6 +90,13 @@ python ./exhaustivity/plot_exhaustivity_factoids.py --force-recalculate
 python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 ```
 
+| Output metric name         | Formula         | Description                                                                                                                                                                                                                                                         |
+| -------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Factoids Semantic Recall   | avg(f_recall)   | `similarity_matrix = cosine_similarity(quintuple_embeddings, gold_quintuple_embeddings)`. <br> Bipartite matching (Hungarian Algorithm): compare each factoids with all g_truth and match the one that minimizes the cost, greater than a threshold (default=0.7).  |
+| Factoids Temporal Recall   | avg(f_recall_t) | Same as semantic, but for each factoids, check if t_start and t_end of g_truth and preduction temporally overlaps                                                                                                                                                   |
+| Quintuples Semantic Recall | avg(q_recall)   | `similarity_matrix = cosine_similarity(quintuple_embeddings, gold_quintuple_embeddings)`. <br> Greedy match: for each quintuple, look for the g_truth with highest similarity, greater than a threshold (default=0.7) in the corresponding row of similarity_matrix |
+| Quintuples Temporal Recall | avg(q_recall_t) | Same as semantic, but for each quintuple, check if t_start and t_end of g_truth and prediction matches, through dateparser.                                                                                                                                         |
+
 ### Quintuples quality - Precision
 
 Make sure you have executed all the Exhaustivity scripts and to have all the required columns inside the `dataset_output.pkl`.  
@@ -102,19 +110,19 @@ python ./quintuples_quality/calculate_quintuples_quality.py -p <your-model-postf
 | -------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `total_gold`                           | count(df[`COLUMN_NAME_QUINTUPLES_GROUND_TRUTH`])   | The total number of reference ground truth quintuples                                                 |
 | `total_predicted`                      | count(df[`COLUMN_NAME_QUINTUPLES_EXTRACTED`])      | The total number of quintuples extracted by the LLM                                                   |
-| `MATCH` - Semantic Recall              | $\frac{MATCH_{count}} {total_{gold}}$              |                                                                                                       |
+| `MATCH` - Semantic Recall              | $\frac{MATCH_{count}} {total_{gold}}$              | It tells us how many g_truth have been matched by the extracted quintuples                            |
 | `OM` - Omission rate                   | $\frac{OM_{count}} {total\_{gold}} = 1-Recall$     | It tells us how much of the quintuples g_truth was forgotten.                                         |
 | `HALL` - Hallucination Rate            | $\frac{HALL_{count}} {total_{gold}} = 1-Precision$ | Represents what percentage of the model's generated output could not be matched to the gold standard. |
 | `MATCH_t` - Temporal Recall            | (only computed if positive semantic match)         | The model got the facts right and the time matched                                                    |
 | `OM_t` - Temporal Hallucination Rate   | (only computed if positive semantic match)         | The model got the facts right, but missed or left out the time context.                               |
 | `HALL_t` - Temporal Hallucination Rate | (only computed if positive semantic match)         | The model got the facts right, but fabricated or severely changed the date.                           |
 
-This test evaluate the quintuples extraction in two cases:
+This test evaluates the quintuples extraction in two cases:
+
 1. Quintuples extracted from raw text: values Precision. It generates fewer tuples, which keeps noise low, but it suffers from poor context extraction, leading to high omission rates on complex data blocks.
 2. Quintuples extracted from Atomic Fact decomposition: values Recall/Exhaustivity. It ensures that subtle nuances aren't ignored, resulting in a much more complete quintuples, though it introduces some redundant ones.
 
 **Caution**: the _"Hallucination rate"_ term might be misleading, because the model is NOT generating false information! In this script it simply means "The model generated a true fact that the human annotator didn't bother to include in the gold standard". It could be refactored as "Redundancy rate".
----
 
 ## Test results
 
