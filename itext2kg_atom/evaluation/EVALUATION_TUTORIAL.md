@@ -170,8 +170,18 @@ Please note that the similarity metric can still be high even when the two runs 
 
 ---
 
-## Cost
+## Costs (only meaningful if you want to use payment APIs as backend infrastructure)
+Required columns from `dataset_output.pkl`:
 
+- COLUMN_NAME_FACTOIDS_EXTRACTED_model_postfix
+- COLUMN_NAME_QUINTUPLES_EXTRACTED_model_postfix
+- COLUMN_NAME_QUINTUPLES_EXTRACTED_FROM_RAW_TEXT_model_postfix
+
+```bash
+python ./costs/cost_estimation.py -p <your-model-postfix>
+```
+
+This test estimates the token cost for extracting factoids from text and extracting quintuples (from factoids and from raw text), using payment API calls (GPT-4o, Claude, Mistral, ...)
 
 
 ## Test results

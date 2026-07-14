@@ -8,6 +8,7 @@ This script calculates the token costs for two scenarios:
 Uses tiktoken to count tokens and estimates costs for different LLM models.
 """
 
+import argparse
 import sys
 import json
 from pathlib import Path
@@ -179,16 +180,21 @@ FEW SHOT EXAMPLES
 # "next month" = first day of September 2024
 '''
 
+from env_config import (
+    column_name_date, column_name_date_translated_paragraph, column_name_factoids_extracted, column_name_quintuples_extracted, column_name_quintuples_extracted_from_raw_text,
+    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list
+)
+
 # Dataset paths
-DATASET_PATH = project_root / "datasets" / "atom" / "nyt_news" / "2020_nyt_COVID_last_version_ready.pkl"
-OUTPUT_JSON_PATH = project_root / "evaluation" / "costs" / "detailed_costs.json"
+DATASET_PATH = project_root / eval_output_dataset_path
+OUTPUT_JSON_PATH = project_root / eval_output_results_path / "detailed_costs.json"
 
 # Column names
-LEAD_COL = "lead_paragraph_observation_date"
-DATE_COL = "date"
-FACTOIDS_COL = "factoids_claude"
-QUINTUPLES_FROM_FACTOIDS_COL = "quintuples_gpt41_from_factoids"
-QUINTUPLES_DIRECT_COL = "quintuples_gpt41"
+LEAD_COL = column_name_date_translated_paragraph
+DATE_COL = column_name_date
+FACTOIDS_COL = column_name_factoids_extracted
+QUINTUPLES_FROM_FACTOIDS_COL = column_name_quintuples_extracted
+QUINTUPLES_DIRECT_COL = column_name_quintuples_extracted_from_raw_text
 
 
 # ==========================
@@ -445,7 +451,7 @@ def count_embedding_tokens_from_quintuples(quintuples_list: List[tuple]) -> Dict
     }
 
 
-def analyze_scenario_F(df: pd.DataFrame) -> Dict[str, Any]:
+def analyze_scenario_F(df: pd.DataFrame, col_factoids: str, col_quintuples_from_factoids: str) -> Dict[str, Any]:
     """
     Analyze token usage for Scenario F (With Factoids)
     Lead Paragraphs -> Atomic Facts -> 5-Tuples
@@ -455,14 +461,14 @@ def analyze_scenario_F(df: pd.DataFrame) -> Dict[str, Any]:
     print("="*80)
     
     # Filter rows that have all required columns
-    required_cols = [LEAD_COL, FACTOIDS_COL, QUINTUPLES_FROM_FACTOIDS_COL]
+    required_cols = [LEAD_COL, col_factoids, col_quintuples_from_factoids]
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
         print(f"Warning: Missing columns: {missing_cols}")
         print(f"Available columns: {list(df.columns)}")
         return {}
     
-    df_valid = df.dropna(subset=[LEAD_COL, FACTOIDS_COL, QUINTUPLES_FROM_FACTOIDS_COL])
+    df_valid = df.dropna(subset=[LEAD_COL, col_factoids, col_quintuples_from_factoids])
     print(f"Analyzing {len(df_valid)} valid rows...")
     
     if len(df_valid) == 0:
@@ -482,7 +488,7 @@ def analyze_scenario_F(df: pd.DataFrame) -> Dict[str, Any]:
     for idx, row in df_valid.iterrows():
         lead_text = str(row[LEAD_COL]) if not pd.isna(row[LEAD_COL]) else ""
         obs_date = str(row[DATE_COL]) if DATE_COL in df.columns and not pd.isna(row[DATE_COL]) else ""
-        factoids = row[FACTOIDS_COL]
+        factoids = row[col_factoids]
         
         # Build system query with observation date
         system_query = f"Observation Date: {obs_date}\n\n{ATOMIC_FACTS_PROMPT}\n\nParagraph: {lead_text}"
@@ -526,9 +532,9 @@ def analyze_scenario_F(df: pd.DataFrame) -> Dict[str, Any]:
     step2_embedding_tokens = []
     
     for idx, row in df_valid.iterrows():
-        factoids = row[FACTOIDS_COL]
+        factoids = row[col_factoids]
         obs_date = str(row[DATE_COL]) if DATE_COL in df.columns and not pd.isna(row[DATE_COL]) else ""
-        quintuples = row[QUINTUPLES_FROM_FACTOIDS_COL]
+        quintuples = row[col_quintuples_from_factoids]
         
         # Format factoids as text for context
         factoids_text = format_factoids(factoids)
@@ -608,7 +614,7 @@ def analyze_scenario_F(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
-def analyze_scenario_F_FT(df: pd.DataFrame) -> Dict[str, Any]:
+def analyze_scenario_F_FT(df: pd.DataFrame, col_factoids: str, col_quintuples_from_factoids: str) -> Dict[str, Any]:
     """
     Analyze token usage for Scenario F-FT (Fine-Tuned for Atomic Facts)
     Only Step 2 is counted: Atomic Facts -> 5-Tuples (Step 1 tokens are not counted)
@@ -618,14 +624,14 @@ def analyze_scenario_F_FT(df: pd.DataFrame) -> Dict[str, Any]:
     print("="*80)
     
     # Filter rows that have all required columns
-    required_cols = [LEAD_COL, FACTOIDS_COL, QUINTUPLES_FROM_FACTOIDS_COL]
+    required_cols = [LEAD_COL, col_factoids, col_quintuples_from_factoids]
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
         print(f"Warning: Missing columns: {missing_cols}")
         print(f"Available columns: {list(df.columns)}")
         return {}
     
-    df_valid = df.dropna(subset=[LEAD_COL, FACTOIDS_COL, QUINTUPLES_FROM_FACTOIDS_COL])
+    df_valid = df.dropna(subset=[LEAD_COL, col_factoids, col_quintuples_from_factoids])
     print(f"Analyzing {len(df_valid)} valid rows...")
     
     if len(df_valid) == 0:
@@ -645,9 +651,9 @@ def analyze_scenario_F_FT(df: pd.DataFrame) -> Dict[str, Any]:
     step2_embedding_tokens = []
     
     for idx, row in df_valid.iterrows():
-        factoids = row[FACTOIDS_COL]
+        factoids = row[col_factoids]
         obs_date = str(row[DATE_COL]) if DATE_COL in df.columns and not pd.isna(row[DATE_COL]) else ""
-        quintuples = row[QUINTUPLES_FROM_FACTOIDS_COL]
+        quintuples = row[col_quintuples_from_factoids]
         
         # Format factoids as text for context
         factoids_text = format_factoids(factoids)
@@ -714,7 +720,7 @@ def analyze_scenario_F_FT(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
-def analyze_scenario_L(df: pd.DataFrame) -> Dict[str, Any]:
+def analyze_scenario_L(df: pd.DataFrame, col_quintuples_from_raw_text: str) -> Dict[str, Any]:
     """
     Analyze token usage for Scenario L (Without Factoids)
     Lead Paragraphs -> 5-Tuples directly
@@ -724,11 +730,11 @@ def analyze_scenario_L(df: pd.DataFrame) -> Dict[str, Any]:
     print("="*80)
     
     # Filter rows that have required columns
-    required_cols = [LEAD_COL, QUINTUPLES_DIRECT_COL]
+    required_cols = [LEAD_COL, col_quintuples_from_raw_text]
     missing_cols = [col for col in required_cols if col not in df.columns]
     
     # Determine which quintuples column to use
-    quintuples_col = QUINTUPLES_DIRECT_COL
+    quintuples_col = col_quintuples_from_raw_text
     if missing_cols:
         print(f"Warning: Missing columns: {missing_cols}")
         print(f"Available columns: {list(df.columns)}")
@@ -1220,28 +1226,48 @@ def save_to_json(results: Dict[str, Any], output_path: Path):
     
     print(f"Results saved successfully!")
 
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Calculate model costs between different scenarios')
+    parser.add_argument('--model-postfix', '-p', type=str, required=True,
+                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
+    return parser.parse_args()
 
 def main():
     """Main execution flow"""
     print("="*80)
     print("TOKEN COST ESTIMATION FOR ATOMIC FACT DECOMPOSITION")
     print("="*80)
+
+    # Parse command line arguments
+    args = parse_arguments()
+
+    if not args.model_postfix:
+        print('--model-postfix arg not provided')
+        return
+    if args.model_postfix not in eval_model_postfixes_list:
+        print(f'Unsupported --model-postfix arg. Supported ones are: {eval_model_postfixes_list}')
+        return
+    
+    col_factoids = f"{FACTOIDS_COL}_{args.model_postfix}"
+    col_quintuples_raw_text = f"{QUINTUPLES_DIRECT_COL}_{args.model_postfix}"
+    col_quintuples_factoids = f"{QUINTUPLES_FROM_FACTOIDS_COL}_{args.model_postfix}"
     
     # Load dataset
     df = load_dataset(DATASET_PATH)
     
     # Analyze Scenario F (with batch pricing for all steps)
-    scenario_f_stats = analyze_scenario_F(df)
+    scenario_f_stats = analyze_scenario_F(df, col_factoids, col_quintuples_factoids)
     scenario_f_costs = calculate_costs(scenario_f_stats, use_batch=True) if scenario_f_stats else {}
     scenario_f_embeddings_costs = calculate_embeddings_costs(scenario_f_stats.get('total_embedding_tokens', 0)) if scenario_f_stats else {}
     
     # Analyze Scenario L (with batch pricing)
-    scenario_l_stats = analyze_scenario_L(df)
+    scenario_l_stats = analyze_scenario_L(df, col_quintuples_raw_text)
     scenario_l_costs = calculate_costs(scenario_l_stats, use_batch=True) if scenario_l_stats else {}
     scenario_l_embeddings_costs = calculate_embeddings_costs(scenario_l_stats.get('total_embedding_tokens', 0)) if scenario_l_stats else {}
     
     # Analyze Scenario F-FT (Fine-Tuned - only Step 2 counted, with batch pricing)
-    scenario_f_ft_stats = analyze_scenario_F_FT(df)
+    scenario_f_ft_stats = analyze_scenario_F_FT(df, col_factoids, col_quintuples_factoids)
     scenario_f_ft_costs = calculate_costs(scenario_f_ft_stats, use_batch=True) if scenario_f_ft_stats else {}
     scenario_f_ft_embeddings_costs = calculate_embeddings_costs(scenario_f_ft_stats.get('total_embedding_tokens', 0)) if scenario_f_ft_stats else {}
     
