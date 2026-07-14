@@ -1,0 +1,154 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-14T11:05:59.583880",
+    "data_path": "C:\\Users\\Mauro\\Documents\\Andrea\\Tesi\\itext2kg_atom\\datasets\\atom\\my_test_datasets\\dataset_output.pkl",
+    "comparisons": [
+      {
+        "name": "raw_text_stability",
+        "col1": "quintuples_extracted_from_raw_text_llamacpp_gemma4_run2",
+        "col2": "quintuples_extracted_from_raw_text_llamacpp_gemma4",
+        "description": "Quintuples from raw text: Run 2 vs Run 1"
+      },
+      {
+        "name": "factoids_stability",
+        "col1": "quintuples_extracted_llamacpp_gemma4_run2",
+        "col2": "quintuples_extracted_llamacpp_gemma4",
+        "description": "Quintuples from Factoids: Run 2 vs Run 1"
+      }
+    ],
+    "total_samples_per_comparison": {
+      "raw_text_stability": 2,
+      "factoids_stability": 2
+    }
+  },
+  "summary_statistics": {
+    "raw_text_stability": {
+      "mean_similarity": 0.7822431074161711,
+      "std_similarity": 0.06671693678335155,
+      "min_similarity": 0.7155261706328195,
+      "max_similarity": 0.8489600441995226,
+      "median_similarity": 0.7822431074161711,
+      "mean_overall_similarity": 0.6166915468073102,
+      "std_overall_similarity": 0.045240199522948055,
+      "n_samples": 2,
+      "comparison_types": {
+        "full_comparison": 2
+      },
+      "mean_count1": 5.0,
+      "std_count1": 1.0,
+      "mean_count2": 5.5,
+      "std_count2": 0.5,
+      "total_count1": 10,
+      "total_count2": 11
+    },
+    "factoids_stability": {
+      "mean_similarity": 1.0000000000000009,
+      "std_similarity": 2.220446049250313e-16,
+      "min_similarity": 1.0000000000000007,
+      "max_similarity": 1.000000000000001,
+      "median_similarity": 1.0000000000000009,
+      "mean_overall_similarity": 0.6653099964572471,
+      "std_overall_similarity": 0.01420364686046488,
+      "n_samples": 2,
+      "comparison_types": {
+        "full_comparison": 2
+      },
+      "mean_count1": 9.0,
+      "std_count1": 2.0,
+      "mean_count2": 9.0,
+      "std_count2": 2.0,
+      "total_count1": 18,
+      "total_count2": 18
+    }
+  },
+  "detailed_results": {
+    "raw_text_stability": [
+      {
+        "similarity": 0.7155261706328195,
+        "overall_mean_similarity": 0.5714513472843621,
+        "count1": 4,
+        "count2": 5,
+        "comparison_type": "full_comparison",
+        "similarity_matrix_shape": [
+          4,
+          5
+        ],
+        "max_similarities": [
+          0.7734005317656356,
+          0.7724747947206413,
+          0.587777662217362,
+          0.7284516938276395
+        ],
+        "row_idx": 0
+      },
+      {
+        "similarity": 0.8489600441995226,
+        "overall_mean_similarity": 0.6619317463302582,
+        "count1": 6,
+        "count2": 6,
+        "comparison_type": "full_comparison",
+        "similarity_matrix_shape": [
+          6,
+          6
+        ],
+        "max_similarities": [
+          1.0000000000000009,
+          0.7474057564023193,
+          0.7839061873322989,
+          0.8884837270576331,
+          0.7660428632031742,
+          0.9079217312017102
+        ],
+        "row_idx": 1
+      }
+    ],
+    "factoids_stability": [
+      {
+        "similarity": 1.000000000000001,
+        "overall_mean_similarity": 0.6511063495967822,
+        "count1": 7,
+        "count2": 7,
+        "comparison_type": "full_comparison",
+        "similarity_matrix_shape": [
+          7,
+          7
+        ],
+        "max_similarities": [
+          1.0000000000000007,
+          1.0000000000000004,
+          1.0000000000000016,
+          1.0000000000000009,
+          1.0000000000000009,
+          1.000000000000001,
+          1.0000000000000013
+        ],
+        "row_idx": 0
+      },
+      {
+        "similarity": 1.0000000000000007,
+        "overall_mean_similarity": 0.6795136433177119,
+        "count1": 11,
+        "count2": 11,
+        "comparison_type": "full_comparison",
+        "similarity_matrix_shape": [
+          11,
+          11
+        ],
+        "max_similarities": [
+          1.0,
+          1.0000000000000004,
+          1.0000000000000013,
+          1.0000000000000013,
+          1.0000000000000009,
+          1.0000000000000004,
+          1.000000000000001,
+          1.0000000000000009,
+          0.9999999999999999,
+          1.0000000000000007,
+          1.0000000000000009
+        ],
+        "row_idx": 1
+      }
+    ]
+  }
+}

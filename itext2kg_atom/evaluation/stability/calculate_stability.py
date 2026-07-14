@@ -14,6 +14,7 @@ Output:
     - Comparison of stability across different extraction approaches (direct extraction vs. factoid-based extraction)
 """
 
+import ast
 import asyncio
 import json
 import logging
@@ -26,6 +27,14 @@ from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
 import sys
 from pathlib import Path
+
+from itext2kg_atom.evaluation.exhaustivity.quintuples_extraction_nyt_from_factoids import extract_quintuples_wrapper as quintuples_extraction_from_factoids
+from itext2kg_atom.evaluation.exhaustivity.quintuples_extraction_nyt import extract_raw_quintuples_wrapper as quintuples_extraction_from_raw_text
+from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    column_name_quintuples_extracted, column_name_quintuples_extracted_from_raw_text,
+    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list
+)
 
 # Add the project root to Python path (same pattern as other scripts)
 current_file = Path(__file__).resolve()
@@ -50,21 +59,21 @@ logger.info("Setting up configuration and API connections...")
 # ============================================================================
 
 # Data configuration - assume same data file structure as quality evaluation
-DATA_PATH = project_root / "datasets" / "nyt_news" / "2020_nyt_COVID_last_version_ready_quintuples_gpt41_from_factoids_run3_run3.pkl"
+DATA_PATH = project_root / eval_output_dataset_path
 
 # Column pairs to compare for stability
 STABILITY_COMPARISONS = [
     {
-        'name': 'factoids_stability',
-        'col1': 'quintuples_gpt41_from_factoids_run3',
-        'col2': 'quintuples_gpt41_from_factoids',
-        'description': 'GPT-4.1 from Factoids: Run 3 vs Run 1'
+        'name': 'raw_text_stability',
+        'col1': f'{column_name_quintuples_extracted_from_raw_text}_{{}}_run2',
+        'col2': f'{column_name_quintuples_extracted_from_raw_text}_{{}}',
+        'description': 'Quintuples from raw text: Run 2 vs Run 1'
     },
     {
-        'name': 'direct_stability',
-        'col1': 'quintuples_gpt41_run3',
-        'col2': 'quintuples_gpt41',
-        'description': 'GPT-4.1 Direct: Run 3 vs Run 1'
+        'name': 'factoids_stability',
+        'col1': f'{column_name_quintuples_extracted}_{{}}_run2',
+        'col2': f'{column_name_quintuples_extracted}_{{}}',
+        'description': 'Quintuples from Factoids: Run 2 vs Run 1'
     }
 ]
 
@@ -72,12 +81,53 @@ STABILITY_COMPARISONS = [
 MAX_SAMPLES = None  # Set to None for all samples, or integer for limit
 
 # Output configuration
-OUTPUT_JSON = project_root / "evaluation" / "stability_results.json"
-EMBEDDINGS_CACHE = project_root / "evaluation" / "stability_embeddings_cache.pkl"
+OUTPUT_JSON = project_root / eval_output_results_path / "stability_results.json"
+EMBEDDINGS_CACHE = project_root / eval_output_results_path / "stability_embeddings_cache.pkl"
 
 # ============================================================================
 # CORE FUNCTIONS
 # ============================================================================
+
+def normalize_quintuples_list(value):
+    """
+    Normalizes a pandas cell value into a list of quintuples (5-tuples).
+    Handles raw lists/tuples, stringified representations, and missing data.
+    """
+    #parsed = value
+
+    # Convert string representation to Python objects
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value in ('[]', '()'):
+            return []
+        try:
+            value = ast.literal_eval(value)
+        except Exception:
+            return []
+    
+    # If it's a NumPy array, convert it to a standard Python list
+    if type(value).__name__ == 'ndarray':
+        value = value.tolist()
+
+    if isinstance(value, (list, tuple)):
+        if len(value) == 0:
+            return []
+
+        # Edge Case: Single quintuple passed directly
+        if len(value) == 5 and isinstance(value[0], str):
+            return [tuple(value)]
+
+        # Standard Case: Extract valid 5-tuples
+        normalized = []
+        for item in value:
+            if isinstance(item, (list, tuple)) and len(item) == 5:
+                normalized.append(tuple(item))
+        return normalized
+
+    if pd.isna(value):
+        return []
+    # Catch-all fallback for unexpected types
+    return []
 
 def format_quintuple_text(quintuple):
     """
@@ -329,8 +379,8 @@ async def evaluate_stability(df, lg_kg_construction, max_samples=None):
             if row_idx % 10 == 0:
                 logger.info(f"Processing row {row_idx + 1}/{len(valid_df)} for {comparison_name}")
             
-            quintuples1 = valid_df[col1].loc[idx]
-            quintuples2 = valid_df[col2].loc[idx]
+            quintuples1 = normalize_quintuples_list(valid_df[col1].loc[idx])
+            quintuples2 = normalize_quintuples_list(valid_df[col2].loc[idx])
             
             # Calculate stability for this row
             row_result = await calculate_row_stability(
@@ -495,6 +545,8 @@ def parse_arguments():
                        help='Maximum number of samples to process (for testing)')
     parser.add_argument('--data-path', '-d', type=str, default=None,
                        help='Path to the data file (overrides default)')
+    parser.add_argument('--model-postfix', '-p', type=str, required=True,
+                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
     return parser.parse_args()
 
 async def main():
@@ -505,6 +557,17 @@ async def main():
     
     # Parse command line arguments
     args = parse_arguments()
+
+    if not args.model_postfix:
+        logger.error('--model-postfix arg not provided')
+        return
+    if args.model_postfix not in eval_model_postfixes_list:
+        logger.error(f'Unsupported --model-postfix arg. Supported ones are: {eval_model_postfixes_list}')
+        return
+    
+    for comp in STABILITY_COMPARISONS:
+        comp['col1'] = comp['col1'].format(args.model_postfix)
+        comp['col2'] = comp['col2'].format(args.model_postfix)
     
     print("🎯 Starting Stability Evaluation")
     print("=" * 50)
@@ -524,10 +587,10 @@ async def main():
         logger.info(f"Using custom data path: {DATA_PATH}")
     
     try:
+
         # Import ATOM modules
         try:
-            from atom.llm_output_parsing.langchain_output_parser import LangchainOutputParser
-            from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+            from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
             print("   ✅ ATOM modules imported successfully")
             logger.info("ATOM modules imported successfully")
         except ImportError as e:
@@ -551,28 +614,21 @@ async def main():
             logger.error(f"Failed to load dataset: {e}")
             return
         
+        # Execute an additional run of quintuples extraction (from factoids and from raw text)
+        if MAX_SAMPLES is not None:
+            await quintuples_extraction_from_raw_text(df.head(MAX_SAMPLES), f"{column_name_quintuples_extracted_from_raw_text}_{args.model_postfix}_run2")
+            await quintuples_extraction_from_factoids(df.head(MAX_SAMPLES), f"{column_name_quintuples_extracted}_{args.model_postfix}_run2")
+        else:
+            await quintuples_extraction_from_raw_text(df, f"{column_name_quintuples_extracted_from_raw_text}_{args.model_postfix}_run2")
+            await quintuples_extraction_from_factoids(df, f"{column_name_quintuples_extracted}_{args.model_postfix}_run2")
+
         # Initialize language model components
         print("🤖 Initializing language model components...")
         logger.info("Initializing language model components")
         try:
-            openai_api_key = "###"
-            
-            openai_llm_model = ChatOpenAI(
-                api_key=openai_api_key,
-                model="o3-mini",
-                max_tokens=None,
-                timeout=None,
-                max_retries=2,
-            )
-            
-            openai_embeddings_model = OpenAIEmbeddings(
-                api_key=openai_api_key,
-                model="text-embedding-3-large",
-            )
-            
             lg_kg_construction = LangchainOutputParser(
-                llm_model=openai_llm_model,
-                embeddings_model=openai_embeddings_model
+                llm_model=get_default_model(),
+                embeddings_model=get_default_embedding_model()
             )
             print("   ✅ Language model components initialized")
             logger.info("Language model components initialized successfully")
@@ -580,7 +636,7 @@ async def main():
             print(f"❌ Error initializing language model: {e}")
             logger.error(f"Failed to initialize language model: {e}")
             return
-        
+
         # Run stability evaluation
         print("🔍 Running stability evaluation...")
         logger.info("Starting stability evaluation")

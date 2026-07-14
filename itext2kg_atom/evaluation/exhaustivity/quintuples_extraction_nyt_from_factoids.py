@@ -14,6 +14,7 @@ Output:
     - Checkpoint files for resuming interrupted processing
 """
 
+import gc
 import sys
 import asyncio
 import logging
@@ -163,6 +164,57 @@ async def extract_quintuples(contexts: list[list[str]], timestamps: list[str]) -
     logger.info(f"✅ Total extracted {total_quintuples} quintuples across {len(contexts)} contexts")
     return all_results
 
+async def extract_quintuples_wrapper(df: pd.DataFrame, quintuples_col_with_postfix: str):
+    start_time = time.time()
+    try:
+        print("🎯 Starting main extraction process...")
+        logger.info("Beginning quintuple extraction from NYT COVID data")
+        
+        # Determine indices to process
+        num_rows = len(df)
+        selected_indices = _uniform_indices(num_rows=num_rows, k=SAMPLER_K)
+        logger.info(f"📝 Processing {len(selected_indices)} rows out of {num_rows} total")
+
+        # Prepare contexts and timestamps for selected rows only
+        context_data = [ast.literal_eval(df.iloc[i][FACTOIDS_COL_NAME]) for i in selected_indices]
+        timestamp_data = [df.iloc[i][DATE_COL_NAME] for i in selected_indices]
+
+        # Extract quintuples for selected contexts
+        extracted = await extract_quintuples(context_data, timestamp_data)
+
+        # Initialize column with empty values, then fill only selected indices
+        empty_value = None
+        df[quintuples_col_with_postfix] = empty_value
+        for idx, value in zip(selected_indices, extracted):
+            df.at[df.index[idx], quintuples_col_with_postfix] = value
+
+        # Compute token count for each row
+        df[column_name_quintuples_prompt_tokenc] = [
+            lg_kg_construction.count_tokens(f"# Context: {txt}\n\n# Question: {Prompt.temporal_system_query(date.strftime('%Y-%m-%d') + Prompt.EXAMPLES.value)}\n\nAnswer: ")
+            for txt, date in zip(df[FACTOIDS_COL_NAME], df[DATE_COL_NAME])
+        ]
+        
+        # Save final results (do not overwrite the whole output dataset, just merge new columns)
+        print(f"💾 Saving final results to: {OUTPUT_DATASET_PATH}")
+        if Path.exists(OUTPUT_DATASET_PATH):
+            df_out_existing = pd.read_pickle(OUTPUT_DATASET_PATH)
+            df_out_existing[quintuples_col_with_postfix] = df[quintuples_col_with_postfix]
+            df_out_existing[column_name_quintuples_prompt_tokenc] = df[column_name_quintuples_prompt_tokenc]
+            df_out_existing.to_pickle(OUTPUT_DATASET_PATH)
+        else:
+            df.to_pickle(OUTPUT_DATASET_PATH)
+        
+        elapsed_time = time.time() - start_time
+        logger.info(f"🎉 Processing completed successfully in {elapsed_time:.2f} seconds!")
+        print(f"🎉 Quintuples extraction completed successfully in {elapsed_time:.2f} seconds!")
+        
+    except Exception as e:
+        elapsed_time = time.time() - start_time
+        logger.error(f"❌ Error occurred after {elapsed_time:.2f} seconds: {str(e)}")
+        print(f"❌ Error occurred: {str(e)}")
+        raise
+    gc.collect()
+
 
 def parse_arguments():
     """Parse command line arguments."""
@@ -172,7 +224,6 @@ def parse_arguments():
     return parser.parse_args()
 
 async def main():
-    start_time = time.time()
 
     # Parse command line arguments
     args = parse_arguments()
@@ -186,54 +237,8 @@ async def main():
     
     quintuples_col_with_postfix = f"{QUINTUPLES_COL_NAME}_{args.model_postfix}"
     #factoids_extracted_col_with_postfix = f"{FACTOIDS_EXTRACTED_COL_NAME}_{args.model_postfix}"
+    await extract_quintuples_wrapper(df_nyt, quintuples_col_with_postfix)
     
-    try:
-        print("🎯 Starting main extraction process...")
-        logger.info("Beginning quintuple extraction from NYT COVID data")
-        
-        # Determine indices to process
-        num_rows = len(df_nyt)
-        selected_indices = _uniform_indices(num_rows=num_rows, k=SAMPLER_K)
-        logger.info(f"📝 Processing {len(selected_indices)} rows out of {num_rows} total")
-
-        # Prepare contexts and timestamps for selected rows only
-        context_data = [ast.literal_eval(df_nyt.iloc[i][FACTOIDS_COL_NAME]) for i in selected_indices]
-        timestamp_data = [df_nyt.iloc[i][DATE_COL_NAME] for i in selected_indices]
-
-        # Extract quintuples for selected contexts
-        extracted = await extract_quintuples(context_data, timestamp_data)
-
-        # Initialize column with empty values, then fill only selected indices
-        empty_value = None
-        df_nyt[quintuples_col_with_postfix] = empty_value
-        for idx, value in zip(selected_indices, extracted):
-            df_nyt.at[df_nyt.index[idx], quintuples_col_with_postfix] = value
-
-        # Compute token count for each row
-        df_nyt[column_name_quintuples_prompt_tokenc] = [
-            lg_kg_construction.count_tokens(f"# Context: {txt}\n\n# Question: {Prompt.temporal_system_query(date.strftime('%Y-%m-%d') + Prompt.EXAMPLES.value)}\n\nAnswer: ")
-            for txt, date in zip(df_nyt[FACTOIDS_COL_NAME], df_nyt[DATE_COL_NAME])
-        ]
-        
-        # Save final results (do not overwrite the whole output dataset, just merge new columns)
-        print(f"💾 Saving final results to: {OUTPUT_DATASET_PATH}")
-        if Path.exists(OUTPUT_DATASET_PATH):
-            df_out_existing = pd.read_pickle(OUTPUT_DATASET_PATH)
-            df_out_existing[quintuples_col_with_postfix] = df_nyt[quintuples_col_with_postfix]
-            df_out_existing[column_name_quintuples_prompt_tokenc] = df_nyt[column_name_quintuples_prompt_tokenc]
-            df_out_existing.to_pickle(OUTPUT_DATASET_PATH)
-        else:
-            df_nyt.to_pickle(OUTPUT_DATASET_PATH)
-        
-        elapsed_time = time.time() - start_time
-        logger.info(f"🎉 Processing completed successfully in {elapsed_time:.2f} seconds!")
-        print(f"🎉 Quintuples extraction completed successfully in {elapsed_time:.2f} seconds!")
-        
-    except Exception as e:
-        elapsed_time = time.time() - start_time
-        logger.error(f"❌ Error occurred after {elapsed_time:.2f} seconds: {str(e)}")
-        print(f"❌ Error occurred: {str(e)}")
-        raise
 
 if __name__ == "__main__":
     print("=" * 50)

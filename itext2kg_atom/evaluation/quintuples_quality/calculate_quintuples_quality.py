@@ -31,7 +31,7 @@ from pathlib import Path
 from models.models import get_default_model, get_default_embedding_model
 from env_config import (
     column_name_quintuples_ground_truth, column_name_quintuples_extracted, column_name_quintuples_extracted_from_raw_text,
-    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list, num_rows_to_process
+    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list
 )
 
 # Add the project root to Python path (same pattern as exhaustivity_evaluation_nyt.py)

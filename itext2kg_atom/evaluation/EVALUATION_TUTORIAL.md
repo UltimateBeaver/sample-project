@@ -47,6 +47,7 @@ EVAL_CHECKPOINT_QUINTUPLES_PATH="${EVAL_BASE_PATH}/quintuples_checkpoint.json"
 
 ---
 
+
 ## Execute the tests
 
 The updated dataset will be saved into `dataset_output.pkl` and the the tests results will be saved into `${EVAL_BASE_PATH}/evaluation_results`.  
@@ -79,7 +80,7 @@ Adds the following columns to the output dataset:
 
 ```bash
 python ./exhaustivity/factoids_extraction_nyt.py -p <your-model-postfix>
-# python ./exhaustivity/quintuples_extraction_nyt.py -p <your-model-postfix>
+python ./exhaustivity/quintuples_extraction_nyt.py -p <your-model-postfix>
 python ./exhaustivity/quintuples_extraction_nyt_from_factoids.py -p <your-model-postfix>
 ```
 
@@ -99,6 +100,12 @@ python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 
 ### Quintuples quality - Precision
 
+Required columns from `dataset_output.pkl`:
+
+- COLUMN_NAME_QUINTUPLES_GROUND_TRUTH
+- COLUMN_NAME_QUINTUPLES_EXTRACTED_model_postfix
+- COLUMN_NAME_QUINTUPLES_EXTRACTED_FROM_RAW_TEXT_model_postfix
+
 Make sure you have executed all the Exhaustivity scripts and to have all the required columns inside the `dataset_output.pkl`.  
 <br>Repeat the following command for each model postfix you want to test.
 
@@ -106,23 +113,54 @@ Make sure you have executed all the Exhaustivity scripts and to have all the req
 python ./quintuples_quality/calculate_quintuples_quality.py -p <your-model-postfix>
 ```
 
+This test evaluates the quintuples extraction quality in two cases:
+
+- **CASE 1**: Quintuples extracted from raw text: values Precision. It generates fewer tuples, which keeps noise low, but it suffers from poor context extraction, leading to high omission rates on complex data blocks.
+- **CASE 2**: Quintuples extracted from Atomic Fact decomposition: values Recall/Exhaustivity. It ensures that subtle nuances aren't ignored, resulting in a much more complete quintuples, though it introduces some redundant ones.
+
 | Output metric name                     | Formula                                            | Description                                                                                           |
 | -------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `total_gold`                           | count(df[`COLUMN_NAME_QUINTUPLES_GROUND_TRUTH`])   | The total number of reference ground truth quintuples                                                 |
 | `total_predicted`                      | count(df[`COLUMN_NAME_QUINTUPLES_EXTRACTED`])      | The total number of quintuples extracted by the LLM                                                   |
-| `MATCH` - Semantic Recall              | $\frac{MATCH_{count}} {total_{gold}}$              | It tells us how many g_truth have been matched by the extracted quintuples                            |
+| `MATCH` - Semantic Recall              | $\frac{MATCH_{count}} {total_{gold}} = Recall$     | It tells us how many g_truth have been matched by the extracted quintuples                            |
 | `OM` - Omission rate                   | $\frac{OM_{count}} {total\_{gold}} = 1-Recall$     | It tells us how much of the quintuples g_truth was forgotten.                                         |
 | `HALL` - Hallucination Rate            | $\frac{HALL_{count}} {total_{gold}} = 1-Precision$ | Represents what percentage of the model's generated output could not be matched to the gold standard. |
 | `MATCH_t` - Temporal Recall            | (only computed if positive semantic match)         | The model got the facts right and the time matched                                                    |
 | `OM_t` - Temporal Hallucination Rate   | (only computed if positive semantic match)         | The model got the facts right, but missed or left out the time context.                               |
 | `HALL_t` - Temporal Hallucination Rate | (only computed if positive semantic match)         | The model got the facts right, but fabricated or severely changed the date.                           |
 
-This test evaluates the quintuples extraction in two cases:
-
-1. Quintuples extracted from raw text: values Precision. It generates fewer tuples, which keeps noise low, but it suffers from poor context extraction, leading to high omission rates on complex data blocks.
-2. Quintuples extracted from Atomic Fact decomposition: values Recall/Exhaustivity. It ensures that subtle nuances aren't ignored, resulting in a much more complete quintuples, though it introduces some redundant ones.
-
 **Caution**: the _"Hallucination rate"_ term might be misleading, because the model is NOT generating false information! In this script it simply means "The model generated a true fact that the human annotator didn't bother to include in the gold standard". It could be refactored as "Redundancy rate".
+
+### Stability
+
+Required columns from `dataset_output.pkl`:
+
+- COLUMN_NAME_QUINTUPLES_EXTRACTED_model_postfix
+- COLUMN_NAME_QUINTUPLES_EXTRACTED_FROM_RAW_TEXT_model_postfix
+
+Make sure you have executed all the Exhaustivity scripts and to have all the required columns inside the `dataset_output.pkl`.  
+<br>Repeat the following command for each model postfix you want to test.
+
+```bash
+python ./stability/calculate_stability.py -p <your-model-postfix>
+```
+
+This test evaluates the quintuples extraction stability in two cases:
+
+- **CASE 1**: Quintuples extracted from raw text
+- **CASE 2**: Quintuples extracted from Atomic Fact decomposition
+
+Please note that the similarity metric can still be high even when the two runs produce very different numbers of quintuples. <br> Let's assume that for a row we have 1 quintuple from run1 and 5 quintuples run2: even if one run emits only one quintuple, that single quintuple can still be semantically very close to one of the quintuples from the other run, so **the similarity can look high**
+
+| Output metric name        | Formula                | Description                                                                                                                                                                                                                                                                        |
+| ------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `total_count`             | count(quintuples)      | How many quintuples have been produced in each run                                                                                                                                                                                                                                 |
+| `mean_count`              |                        | Average quintuples count in each run                                                                                                                                                                                                                                               |
+| `std_count`               |                        | Standard deviation of quintuples count in each run                                                                                                                                                                                                                                 |
+| `mean_similarity`         | avg(max_similarities)  | `similarity_matrix = cosine_similarity(embeddings_run1, embeddings_run2)`. <br> Greedy match: for each quintuple in run1, select the quintuple from run2 with the highest similarity in the corresponding row of similarity_matrix. Then compute the mean similarity, for each row |
+| `overall_mean_similarity` | avg(similarity_matrix) | Compute the average similarity across the whole similarity_matrix, for each row                                                                                                                                                                                                    |
+| Aggregated metrics        | -                      | Mean, Standard Deviation, Min, Max, Median across the whole dataset `mean_similarity`                                                                                                                                                                                              |
+
 
 ## Test results
 

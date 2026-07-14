@@ -14,6 +14,7 @@ Output:
     - Checkpoint files for resuming interrupted processing
 """
 
+import gc
 import sys
 import asyncio
 import logging
@@ -193,28 +194,8 @@ async def extract_quintuples_batch(contexts: list[str], timestamps: list[str]) -
     logger.info(f"✅ Batch extraction completed: {total_quintuples} quintuples across {len(contexts)} contexts")
     return batch_results
 
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Extract factoids from raw news paragraphs - Factoids Analysis')
-    parser.add_argument('--model-postfix', '-p', type=str, required=True,
-                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
-    return parser.parse_args()
-
-async def main():
+async def extract_raw_quintuples_wrapper(df: pd.DataFrame, quintuples_col_with_postfix: str):
     start_time = time.time()
-
-    # Parse command line arguments
-    args = parse_arguments()
-
-    if not args.model_postfix:
-        logger.error('--model-postfix arg not provided')
-        return
-    if args.model_postfix not in eval_model_postfixes_list:
-        logger.error(f'Unsupported --model-postfix arg. Supported ones are: {eval_model_postfixes_list}')
-        return
-    
-    quintuples_col_with_postfix = f"{QUINTUPLES_COL_NAME}_{args.model_postfix}"
-    
     try:
         print("🎯 Starting main extraction process...")
         logger.info("Beginning quintuple extraction from NYT COVID data")
@@ -223,7 +204,7 @@ async def main():
         checkpoint = load_checkpoint()
         
         # Determine indices to process
-        num_rows = len(df_nyt)
+        num_rows = len(df)
         selected_indices = _uniform_indices(num_rows=num_rows, k=SAMPLER_K)
         logger.info(f"📝 Processing {len(selected_indices)} rows out of {num_rows} total")
 
@@ -236,14 +217,14 @@ async def main():
         logger.info(f"📦 Created {len(batches)} batches of size {BATCH_SIZE}")
 
         # Initialize the results column if not exists
-        if quintuples_col_with_postfix not in df_nyt.columns:
-            df_nyt[quintuples_col_with_postfix] = None
+        if quintuples_col_with_postfix not in df.columns:
+            df[quintuples_col_with_postfix] = None
 
         # Load existing results from checkpoint
         for idx_str, result in checkpoint.get("results", {}).items():
             idx = int(idx_str)
-            if idx < len(df_nyt):
-                df_nyt.at[df_nyt.index[idx], quintuples_col_with_postfix] = result
+            if idx < len(df):
+                df.at[df.index[idx], quintuples_col_with_postfix] = result
 
         # Process batches
         for batch_idx, batch_indices in enumerate(batches):
@@ -254,15 +235,15 @@ async def main():
             logger.info(f"🔄 Processing batch {batch_idx + 1}/{len(batches)} ({len(batch_indices)} items)")
             
             # Prepare contexts and timestamps for this batch
-            batch_contexts = [df_nyt.iloc[i][PARAGRAPHS_COL_NAME] for i in batch_indices]
-            batch_timestamps = [df_nyt.iloc[i][DATE_COL_NAME] for i in batch_indices]
+            batch_contexts = [df.iloc[i][PARAGRAPHS_COL_NAME] for i in batch_indices]
+            batch_timestamps = [df.iloc[i][DATE_COL_NAME] for i in batch_indices]
             
             # Extract quintuples for this batch
             batch_results = await extract_quintuples_batch(batch_contexts, batch_timestamps)
             
             # Store results in dataframe and checkpoint
             for idx, result in zip(batch_indices, batch_results):
-                df_nyt.at[df_nyt.index[idx], quintuples_col_with_postfix] = result
+                df.at[df.index[idx], quintuples_col_with_postfix] = result
                 checkpoint["results"][str(idx)] = result
             
             # Mark batch as completed and save checkpoint
@@ -272,20 +253,20 @@ async def main():
             logger.info(f"✅ Batch {batch_idx + 1}/{len(batches)} completed and saved")
 
         # Compute token count for each row
-        df_nyt[column_name_quintuples_raw_prompt_tokenc] = [
+        df[column_name_quintuples_raw_prompt_tokenc] = [
             lg_kg_construction.count_tokens(f"# Context: {txt}\n\n# Question: {Prompt.temporal_system_query(date.strftime('%Y-%m-%d') + Prompt.EXAMPLES.value)}\n\nAnswer: ")
-            for txt, date in zip(df_nyt[PARAGRAPHS_COL_NAME], df_nyt[DATE_COL_NAME])
+            for txt, date in zip(df[PARAGRAPHS_COL_NAME], df[DATE_COL_NAME])
         ]
 
         # Save final results (do not overwrite the whole output dataset, just merge new columns)
         print(f"💾 Saving final results to: {OUTPUT_DATASET_PATH}")
         if Path.exists(OUTPUT_DATASET_PATH):
             df_out_existing = pd.read_pickle(OUTPUT_DATASET_PATH)
-            df_out_existing[quintuples_col_with_postfix] = df_nyt[quintuples_col_with_postfix]
-            df_out_existing[column_name_quintuples_raw_prompt_tokenc] = df_nyt[column_name_quintuples_raw_prompt_tokenc]
+            df_out_existing[quintuples_col_with_postfix] = df[quintuples_col_with_postfix]
+            df_out_existing[column_name_quintuples_raw_prompt_tokenc] = df[column_name_quintuples_raw_prompt_tokenc]
             df_out_existing.to_pickle(OUTPUT_DATASET_PATH)
         else:
-            df_nyt.to_pickle(OUTPUT_DATASET_PATH)
+            df.to_pickle(OUTPUT_DATASET_PATH)
         
         # Clean up checkpoint file
         if CHECKPOINT_FILE.exists():
@@ -302,6 +283,31 @@ async def main():
         print(f"❌ Error occurred: {str(e)}")
         print("💡 Progress has been saved. Re-run the script to resume from where it left off.")
         raise
+    gc.collect()
+
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Extract factoids from raw news paragraphs - Factoids Analysis')
+    parser.add_argument('--model-postfix', '-p', type=str, required=True,
+                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
+    return parser.parse_args()
+
+async def main():
+
+    # Parse command line arguments
+    args = parse_arguments()
+
+    if not args.model_postfix:
+        logger.error('--model-postfix arg not provided')
+        return
+    if args.model_postfix not in eval_model_postfixes_list:
+        logger.error(f'Unsupported --model-postfix arg. Supported ones are: {eval_model_postfixes_list}')
+        return
+    
+    quintuples_col_with_postfix = f"{QUINTUPLES_COL_NAME}_{args.model_postfix}"
+    await extract_raw_quintuples_wrapper(df_nyt, quintuples_col_with_postfix)
+    
 
 if __name__ == "__main__":
     print("=" * 50)
