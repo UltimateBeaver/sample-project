@@ -47,7 +47,6 @@ EVAL_CHECKPOINT_QUINTUPLES_PATH="${EVAL_BASE_PATH}/quintuples_checkpoint.json"
 
 ---
 
-
 ## Execute the tests
 
 The updated dataset will be saved into `dataset_output.pkl` and the the tests results will be saved into `${EVAL_BASE_PATH}/evaluation_results`.  
@@ -64,6 +63,8 @@ cd itext2kg_atom/evaluation
 Open up [models.py](../../models/models.py) and check if its functions return your desired llm model and embedding model. If no, check out [models_config.py](../../models/models_config.py).  
 <br> Depending on which model and backend you are going to use, you shoud edit the `EVAL_MODEL_POSTFIXES_LIST` and `EVAL_MODEL_POSTFIXES_TO_PLOT_LIST` env vars accordingly.
 
+---
+
 ### Exhaustivity - Recall (factoids and quintuples)
 
 Adds the following columns to the output dataset:
@@ -76,7 +77,7 @@ Adds the following columns to the output dataset:
 - COLUMN_NAME_QUINTUPLES_RAW_EXTRACTION_PROMPT_TOKEN_COUNT
 
 <br> Repeat the following command for each model postfix you want to test.  
-<br> Make sure all the postfix exists inside `EVAL_MODEL_POSTFIXES_LIST`
+<br> Make sure all the postfixes exist inside `EVAL_MODEL_POSTFIXES_LIST`
 
 ```bash
 python ./exhaustivity/factoids_extraction_nyt.py -p <your-model-postfix>
@@ -93,10 +94,12 @@ python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 
 | Output metric name         | Formula         | Description                                                                                                                                                                                                                                                         |
 | -------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Factoids Semantic Recall   | avg(f_recall)   | `similarity_matrix = cosine_similarity(quintuple_embeddings, gold_quintuple_embeddings)`. <br> Bipartite matching (Hungarian Algorithm): compare each factoids with all g_truth and match the one that minimizes the cost, greater than a threshold (default=0.7).  |
-| Factoids Temporal Recall   | avg(f_recall_t) | Same as semantic, but for each factoids, check if t_start and t_end of g_truth and preduction temporally overlaps                                                                                                                                                   |
+| Factoids Semantic Recall   | avg(f_recall)   | `similarity_matrix = cosine_similarity(quintuple_embeddings, gold_quintuple_embeddings)`. <br> Bipartite matching (Hungarian Algorithm): compare each factoid with all g_truth and match the one that minimizes the cost, greater than a threshold (default=0.7).   |
+| Factoids Temporal Recall   | avg(f_recall_t) | Same as semantic, but for each factoid, check if t_start and t_end of g_truth and preduction temporally overlaps                                                                                                                                                    |
 | Quintuples Semantic Recall | avg(q_recall)   | `similarity_matrix = cosine_similarity(quintuple_embeddings, gold_quintuple_embeddings)`. <br> Greedy match: for each quintuple, look for the g_truth with highest similarity, greater than a threshold (default=0.7) in the corresponding row of similarity_matrix |
 | Quintuples Temporal Recall | avg(q_recall_t) | Same as semantic, but for each quintuple, check if t_start and t_end of g_truth and prediction matches, through dateparser.                                                                                                                                         |
+
+---
 
 ### Quintuples quality - Precision
 
@@ -131,7 +134,9 @@ This test evaluates the quintuples extraction quality in two cases:
 
 **Caution**: the _"Hallucination rate"_ term might be misleading, because the model is NOT generating false information! In this script it simply means "The model generated a true fact that the human annotator didn't bother to include in the gold standard". It could be refactored as "Redundancy rate".
 
-### Stability
+---
+
+### Stability (similarity and Jaccard similarity)
 
 Required columns from `dataset_output.pkl`:
 
@@ -142,7 +147,8 @@ Make sure you have executed all the Exhaustivity scripts and to have all the req
 <br>Repeat the following command for each model postfix you want to test.
 
 ```bash
-python ./stability/calculate_stability.py -p <your-model-postfix>
+python ./stability/calculate_stability.py --force-extraction -p <your-model-postfix>
+python ./stability/calculate_stability_jaccard.py -p <your-model-postfix>
 ```
 
 This test evaluates the quintuples extraction stability in two cases:
@@ -155,11 +161,17 @@ Please note that the similarity metric can still be high even when the two runs 
 | Output metric name        | Formula                | Description                                                                                                                                                                                                                                                                        |
 | ------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `total_count`             | count(quintuples)      | How many quintuples have been produced in each run                                                                                                                                                                                                                                 |
-| `mean_count`              |                        | Average quintuples count in each run                                                                                                                                                                                                                                               |
-| `std_count`               |                        | Standard deviation of quintuples count in each run                                                                                                                                                                                                                                 |
-| `mean_similarity`         | avg(max_similarities)  | `similarity_matrix = cosine_similarity(embeddings_run1, embeddings_run2)`. <br> Greedy match: for each quintuple in run1, select the quintuple from run2 with the highest similarity in the corresponding row of similarity_matrix. Then compute the mean similarity, for each row |
+| `mean_count`              | -                      | Average quintuples count in each run                                                                                                                                                                                                                                               |
+| `std_count`               | -                      | Standard deviation of quintuples count in each run                                                                                                                                                                                                                                 |
+| `similarity`         | avg(max_similarities)  | `similarity_matrix = cosine_similarity(embeddings_run1, embeddings_run2)`. <br> Greedy match: for each quintuple in run1, select the quintuple from run2 with the highest similarity in the corresponding row of similarity_matrix. Then compute the mean similarity, for each row |
 | `overall_mean_similarity` | avg(similarity_matrix) | Compute the average similarity across the whole similarity_matrix, for each row                                                                                                                                                                                                    |
-| Aggregated metrics        | -                      | Mean, Standard Deviation, Min, Max, Median across the whole dataset `mean_similarity`                                                                                                                                                                                              |
+| `jaccard_similarity` | $\frac{\mid A \cap B \mid}{\mid A \cup B \mid}$ | Let `A` and `B` be respectively the set of quintuples in run1 and run2. Compute the similarity_matrix, and select the best matches for each quintuple in run1 and run2. Then compute the Jaccard similarity, for each row |
+| Aggregated metrics        | -                      | Mean, Standard Deviation, Min, Max, Median across the whole dataset `similarity` and `jaccard_similarity`                                                                                                                                                                                              |
+
+---
+
+## Cost
+
 
 
 ## Test results

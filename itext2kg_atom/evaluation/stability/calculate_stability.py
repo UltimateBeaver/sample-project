@@ -545,6 +545,8 @@ def parse_arguments():
                        help='Maximum number of samples to process (for testing)')
     parser.add_argument('--data-path', '-d', type=str, default=None,
                        help='Path to the data file (overrides default)')
+    parser.add_argument('--force-extraction', '-f', action='store_true',
+                       help='Force quintuples extraction even if existing results are found')
     parser.add_argument('--model-postfix', '-p', type=str, required=True,
                        help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
     return parser.parse_args()
@@ -568,6 +570,9 @@ async def main():
     for comp in STABILITY_COMPARISONS:
         comp['col1'] = comp['col1'].format(args.model_postfix)
         comp['col2'] = comp['col2'].format(args.model_postfix)
+    
+    col_quintuples_raw_text_run2 = f"{column_name_quintuples_extracted_from_raw_text}_{args.model_postfix}_run2"
+    col_quintuples_factoids_run2 = f"{column_name_quintuples_extracted}_{args.model_postfix}_run2"
     
     print("🎯 Starting Stability Evaluation")
     print("=" * 50)
@@ -615,12 +620,13 @@ async def main():
             return
         
         # Execute an additional run of quintuples extraction (from factoids and from raw text)
-        if MAX_SAMPLES is not None:
-            await quintuples_extraction_from_raw_text(df.head(MAX_SAMPLES), f"{column_name_quintuples_extracted_from_raw_text}_{args.model_postfix}_run2")
-            await quintuples_extraction_from_factoids(df.head(MAX_SAMPLES), f"{column_name_quintuples_extracted}_{args.model_postfix}_run2")
-        else:
-            await quintuples_extraction_from_raw_text(df, f"{column_name_quintuples_extracted_from_raw_text}_{args.model_postfix}_run2")
-            await quintuples_extraction_from_factoids(df, f"{column_name_quintuples_extracted}_{args.model_postfix}_run2")
+        if args.force_extraction or col_quintuples_raw_text_run2 not in df.columns or col_quintuples_factoids_run2 not in df.columns:
+            if MAX_SAMPLES is not None:
+                await quintuples_extraction_from_raw_text(df.head(MAX_SAMPLES), col_quintuples_raw_text_run2)
+                await quintuples_extraction_from_factoids(df.head(MAX_SAMPLES), col_quintuples_factoids_run2)
+            else:
+                await quintuples_extraction_from_raw_text(df, col_quintuples_raw_text_run2)
+                await quintuples_extraction_from_factoids(df, col_quintuples_factoids_run2)
 
         # Initialize language model components
         print("🤖 Initializing language model components...")
