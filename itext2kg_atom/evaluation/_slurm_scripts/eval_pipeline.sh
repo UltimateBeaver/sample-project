@@ -90,7 +90,7 @@ echo "--- Running Latency Tests ---"
 python ./latency/test_graphiti.py
 python ./latency/testing_atom.py
 python ./latency/testing_itext2kg.py
-python ./latency/latency_comparison.py
+python ./latency/plot_latency_comparison.py
 
 echo "--- Running Quintuples Quality Tests ---"
 python ./quintuples_quality/calculate_quintuples_quality.py -p $MODEL_POSTFIX

@@ -123,7 +123,7 @@ Execute the following commands to record the latency of ATOM, itext2kg and Graph
 python ./latency/testing_graphiti.py
 python ./latency/testing_atom.py
 python ./latency/testing_itex2kg.py
-python ./latency/latency_comparison.py
+python ./latency/plot_latency_comparison.py
 ```
 
 The chart shows the number of factoids on the X axis and the total processing hours on the Y axis.
