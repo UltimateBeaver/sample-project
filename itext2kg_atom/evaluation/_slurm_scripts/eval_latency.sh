@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=Evaluation_Exhaustivity
+#SBATCH --job-name=Evaluation_Latency
 #SBATCH --nodes=1                     # Request 1 compute node
 #SBATCH --ntasks=1                    # 1 main task execution
 #SBATCH --cpus-per-task=4             # Request 4 CPU cores for data processing
@@ -7,8 +7,8 @@
 #SBATCH --gres=gpu:2                  # Request 2 GPU (Required for Gemma 4)
 #SBATCH --time=0-8:00:00             # Max runtime (Hours: 8 hours)
 #SBATCH --partition=gpu_a40           # GPU partition on the cluster
-#SBATCH --output=logs/exhaustivity_stdout.log    # Standard output log file
-#SBATCH --error=logs/exhaustivity_stderr.log     # Standard error log file
+#SBATCH --output=logs/latency_stdout.log    # Standard output log file
+#SBATCH --error=logs/latency_stderr.log     # Standard error log file
 
 # =========================================================================
 # 1. Environment & Path Initialization
@@ -51,12 +51,12 @@ export PATH=$SCRATCH_FLASH/thesis-project/llama.cpp/build/bin:$PATH
 # =========================================================================
 # 2. Launch Background Infrastructure Services
 # =========================================================================
-# echo "Launching Neo4j container via Apptainer..."
-# # Set the database username/password matching your .env configurations
-# export APPTAINERENV_NEO4J_AUTH="neo4j/password"
-# mkdir -p $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs
-# apptainer run --writable-tmpfs --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs ./neo4j.sif &
-# NEO4J_PID=$!
+echo "Launching Neo4j container via Apptainer..."
+# Set the database username/password matching your .env configurations
+export APPTAINERENV_NEO4J_AUTH="neo4j/password"
+mkdir -p $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs
+apptainer run --writable-tmpfs --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs ./neo4j.sif &
+NEO4J_PID=$!
 
 echo "Launching llama.cpp Model and Embedding Servers..."
 chmod +x start-llama-servers.sh
@@ -87,7 +87,7 @@ python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 echo "Terminating all background cluster services gracefully..."
 
 # Stop the Apptainer database container
-# kill $NEO4J_PID
+kill $NEO4J_PID
 
 # Give the Neo4j engine enough time to safely flush transactions and release file locks
 # echo "Waiting 15 seconds for Neo4j files to completely close..."

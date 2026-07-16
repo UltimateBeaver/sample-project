@@ -72,7 +72,7 @@ Open up [models.py](../../models/models.py) and check if its functions return yo
 <br>
 
 If you are going to execute these tests on **HPC POLITO CLUSTER**, move to the `_slurm_scripts` directory and execute each script. That will allow to send multiple jobs in parallel.
-<br> Remember to edit the **_slurm_env_config** file according to your current architecture you want to test
+<br> Remember to edit the **_slurm_env_config** file according to your current architecture you want to test. If some cluster config is missing, the default value will be applied, inside the single test script, through `#SBATCH` directive
 
 ```bash
 cd _slurm_scripts
@@ -127,12 +127,6 @@ python ./latency/latency_comparison.py
 ```
 
 The chart shows the number of factoids on the X axis and the total processing hours on the Y axis.
-
----
-### Merge (ATOM, itext2kg and Graphiti)
-```bash
-python ./merge/evaluate_atom_merge.py
-```
 
 ---
 
