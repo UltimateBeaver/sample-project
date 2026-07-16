@@ -70,7 +70,7 @@ sleep 30
 # 3. Run Core Python Evaluation test
 # =========================================================================
 # Add the slurm config file to this scope (to get $MODEL_POSTFIX value)
-source ./_slurm_env_config
+source ./slurm_config.env
 # Move into the evaluation tests directory
 cd $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/evaluation
 echo "Starting evaluation > Exhaustivity test"
