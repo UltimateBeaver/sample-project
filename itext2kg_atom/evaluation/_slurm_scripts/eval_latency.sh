@@ -69,10 +69,14 @@ sleep 30
 # =========================================================================
 # 3. Run Core Python Evaluation test
 # =========================================================================
-# Add the slurm config file to this scope (to get $MODEL_POSTFIX value)
-source ./slurm_config.env
 # Move into the evaluation tests directory
 cd $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/evaluation
+
+# Tell Python where the root directory of your project is
+export PYTHONPATH=$SCRATCH_FLASH/thesis-project/sample-project:$PYTHONPATH
+
+# Add the slurm config file to this scope (to get $MODEL_POSTFIX value)
+source ./_slurm_scripts/_slurm_config.env
 echo "Starting evaluation > Exhaustivity test"
 python ./exhaustivity/factoids_extraction_nyt.py -p $MODEL_POSTFIX
 python ./exhaustivity/quintuples_extraction_nyt.py -p $MODEL_POSTFIX
@@ -103,6 +107,6 @@ pkill llama-server
 #     neo4j-admin database dump neo4j --to-path=/data --overwrite-destination=true
 
 # Copy modified files on $SCRATCH_FLASH back to $HOME
-rsync -av --exclude '.git' $SCRATCH_FLASH/thesis-project/sample-project/ $HOME/thesis-project/sample-project/
+rsync -av --exclude '.git' --exclude 'venv' $SCRATCH_FLASH/thesis-project/sample-project/ $HOME/thesis-project/sample-project/
 
 echo "Job completed successfully!"
