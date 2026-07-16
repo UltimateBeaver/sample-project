@@ -74,7 +74,9 @@ Open up [models.py](../../models/models.py) and check if its functions return yo
 If you are going to execute these tests on **HPC POLITO CLUSTER**, move to the `_slurm_scripts` directory and execute each script. That will allow to send multiple jobs in parallel.
 <br> Remember to edit the **_slurm_env_config** file according to your current architecture you want to test
 ```bash
-sbatch ./_slurm_scripts/eval_exhaustivity.sh
+cd _slurm_scripts
+chmod +x ./eval_exhaustivity.sh
+sbatch ./eval_exhaustivity.sh
 ```
 
 ---
