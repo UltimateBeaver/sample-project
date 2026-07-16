@@ -73,10 +73,11 @@ Open up [models.py](../../models/models.py) and check if its functions return yo
 
 If you are going to execute these tests on **HPC POLITO CLUSTER**, move to the `_slurm_scripts` directory and execute each script. That will allow to send multiple jobs in parallel.
 <br> Remember to edit the **_slurm_env_config** file according to your current architecture you want to test
+
 ```bash
 cd _slurm_scripts
 chmod +x ./eval_exhaustivity.sh
-sbatch ./eval_exhaustivity.sh
+chmod +x start_evaluation_wrapper.sh && ./start_evaluation_wrapper.sh
 ```
 
 ---
@@ -116,13 +117,21 @@ python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 | Quintuples Temporal Recall | avg(q_recall_t) | Same as semantic, but for each quintuple, check if t_start and t_end of g_truth and prediction matches, through dateparser.                                                                                                                                         |
 
 ---
-### Latency (ATOM and itext2kg)
+### Latency (ATOM, itext2kg and Graphiti)
 Execute the following commands to record the latency of ATOM, itext2kg and Graphiti frameworks and plot a comparison chart. <br> Make sure your **neo4j container is running**, for Graphiti!
 ```bash
 python ./latency/testing_graphiti.py
 python ./latency/testing_atom.py
 python ./latency/testing_itex2kg.py
 python ./latency/latency_comparison.py
+```
+
+The chart shows the number of factoids on the X axis and the total processing hours on the Y axis.
+
+---
+### Merge (ATOM, itext2kg and Graphiti)
+```bash
+python ./merge/evaluate_atom_merge.py
 ```
 
 ---

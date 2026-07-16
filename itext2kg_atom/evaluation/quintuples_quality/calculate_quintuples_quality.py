@@ -67,6 +67,7 @@ SIMILARITY_THRESHOLD = 0.7
 MAX_SAMPLES = None # Set to None for all samples, or integer for limit
 
 # Output configuration
+Path(project_root / eval_output_results_path).mkdir(parents=True, exist_ok=True)
 OUTPUT_JSON = project_root / eval_output_results_path / "quintuples_quality_results.json"
 GOLD_EMBEDDINGS_CACHE = project_root / eval_output_results_path / "gold_quintuples_embeddings_cache.pkl"
 

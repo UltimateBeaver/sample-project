@@ -8,14 +8,23 @@ Recall: Measures how well ATOM is merging entities compared to ground truth
 """
 
 import os
+from pathlib import Path
 import pickle
+import sys
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Dict, Any, Tuple
 import asyncio
-from langchain_openai import OpenAIEmbeddings
+from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    eval_input_dataset_path, eval_cache_path
+)
 
+# Add the project root to Python path (same pattern as other scripts)
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+sys.path.append(str(project_root))
 
 # ============================================================================
 # GLOBAL CONFIGURATION
@@ -25,22 +34,13 @@ from langchain_openai import OpenAIEmbeddings
 ATOM_KG_PATH = "/Users/yassirlairgi/Developer/Projects/ATOM_Article/batch_cache_atom/final_kg.pkl"
 
 # Path to the df_nyt pickle file (contains ground truth data)
-DF_NYT_PATH = "/Users/yassirlairgi/Developer/Projects/ATOM_Article/datasets/nyt_news/2020_nyt_COVID_last_version_ready_quintuples_gpt41_from_factoids_run3_run3.pkl"
+DF_NYT_PATH = project_root / eval_input_dataset_path
 
 # Similarity threshold for determining duplicates
 THRESHOLD = 0.8
 
 # Cache file for ground truth entity embeddings
-ENTITY_EMBEDDINGS_CACHE = "./entity_embeddings_ground_truth_atom.pkl"
-
-# OpenAI API Key
-OPENAI_API_KEY = "###"
-
-# Initialize embeddings model using LangchainOutputParser approach
-embeddings_model = OpenAIEmbeddings(
-    api_key=OPENAI_API_KEY,
-    model="text-embedding-3-large",
-)
+ENTITY_EMBEDDINGS_CACHE = project_root / eval_cache_path / "atom" / "entity_embeddings_ground_truth_atom.pkl"
 
 
 # ============================================================================
@@ -781,7 +781,7 @@ async def main():
     er_recall, ground_truth_merged = await calculate_ER_recall(
         atom_kg, 
         df_nyt, 
-        embeddings_model,
+        get_default_embedding_model(),
         threshold=THRESHOLD,
         cache_path=ENTITY_EMBEDDINGS_CACHE
     )
@@ -795,7 +795,7 @@ async def main():
     rr_recall, ground_truth_merged_relations = await calculate_RR_recall(
         atom_kg, 
         df_nyt, 
-        embeddings_model,
+        get_default_embedding_model(),
         threshold=THRESHOLD,
         cache_path=ENTITY_EMBEDDINGS_CACHE
     )

@@ -81,6 +81,7 @@ STABILITY_COMPARISONS = [
 MAX_SAMPLES = None  # Set to None for all samples, or integer for limit
 
 # Output configuration
+Path(project_root / eval_output_results_path).mkdir(parents=True, exist_ok=True)
 OUTPUT_JSON = project_root / eval_output_results_path / "stability_results.json"
 EMBEDDINGS_CACHE = project_root / eval_output_results_path / "stability_embeddings_cache.pkl"
 

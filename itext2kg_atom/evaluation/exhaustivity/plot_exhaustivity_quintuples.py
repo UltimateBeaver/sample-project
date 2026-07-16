@@ -70,6 +70,7 @@ SIMILARITY_THRESHOLD = 0.7
 MAX_SAMPLES = None  # Set to None for all samples, or integer for limit
 
 # Output configuration
+Path(project_root / eval_output_results_path).mkdir(parents=True, exist_ok=True)
 OUTPUT_JSON = project_root / eval_output_results_path / "exhaustivity_quintuples_results.json"
 OUTPUT_PLOT_PNG = project_root / eval_output_results_path / "exhaustivity_quintuples_plot_publication.png"
 OUTPUT_PLOT_PDF = project_root / eval_output_results_path / "exhaustivity_quintuples_plot_publication.pdf"

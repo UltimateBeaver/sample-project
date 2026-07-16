@@ -28,9 +28,9 @@ ATOM_JSON_PATH = CACHE_DIR / "cache_atom" / "batch_latency_atom.json"
 ITEXT2KG_JSON_PATH = CACHE_DIR / "cache_itext2kg" / "batch_latency_itext2kg.json"
 
 # Output configuration
+Path(project_root / eval_output_results_path).mkdir(parents=True, exist_ok=True)
 OUTPUT_PLOT_PNG = project_root / eval_output_results_path / "latency_comparison_plot.png"
 OUTPUT_PLOT_PDF = project_root / eval_output_results_path / "latency_comparison_plot.pdf"
-
 
 
 def load_graphiti_data(json_path):

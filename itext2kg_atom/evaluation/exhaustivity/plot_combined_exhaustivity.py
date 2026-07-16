@@ -53,6 +53,7 @@ FACTOIDS_JSON = project_root / eval_output_results_path / "exhaustivity_factoids
 QUINTUPLES_JSON = project_root / eval_output_results_path / "exhaustivity_quintuples_results.json"
 
 # Output configuration
+Path(project_root / eval_output_results_path).mkdir(parents=True, exist_ok=True)
 OUTPUT_PLOT_PNG = project_root / eval_output_results_path / "combined_exhaustivity_plot_publication.png"
 OUTPUT_PLOT_PDF = project_root / eval_output_results_path / "combined_exhaustivity_plot_publication.pdf"
 

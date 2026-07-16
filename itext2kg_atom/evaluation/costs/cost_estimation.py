@@ -187,6 +187,7 @@ from env_config import (
 
 # Dataset paths
 DATASET_PATH = project_root / eval_output_dataset_path
+Path(project_root / eval_output_results_path).mkdir(parents=True, exist_ok=True)
 OUTPUT_JSON_PATH = project_root / eval_output_results_path / "detailed_costs.json"
 
 # Column names
