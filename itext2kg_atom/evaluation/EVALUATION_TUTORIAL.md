@@ -58,11 +58,24 @@ Open up a terminal and do:
 start-llama-servers
 # else, make sure you have your models backend up and running!
 
+#### Needed for graphiti_latency test ####
+# if you are using Neo4j inside Docker
+docker compose up -d
+# else if you are using Neo4j inside Apptainer
+
+
 cd itext2kg_atom/evaluation
 ```
 
 Open up [models.py](../../models/models.py) and check if its functions return your desired llm model and embedding model. If no, check out [models_config.py](../../models/models_config.py).  
 <br> Depending on which model and backend you are going to use, you shoud edit the `EVAL_MODEL_POSTFIXES_LIST` and `EVAL_MODEL_POSTFIXES_TO_PLOT_LIST` env vars accordingly.
+<br>
+
+If you are going to execute these tests on **HPC POLITO CLUSTER**, move to the `_slurm_scripts` directory and execute each script. That will allow to send multiple jobs in parallel.
+<br> Remember to edit the **_slurm_env_config** file according to your current architecture you want to test
+```bash
+sbatch ./_slurm_scripts/eval_exhaustivity.sh
+```
 
 ---
 

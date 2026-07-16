@@ -1,0 +1,3 @@
+# The postfix that will be added to the output columns to the dataset_output.pkl
+# Change it according to the current architecture you are testing
+MODEL_POSTFIX=llamacpp_gemma4
