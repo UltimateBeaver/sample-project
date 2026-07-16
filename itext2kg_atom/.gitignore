@@ -170,5 +170,7 @@ env/
 .vscode/
 .pytest_cache/
 
-datasets/atom/my_test_datasets/cache
-datasets/atom/my_test_datasets/evaluation_results
+datasets/atom/my_test_datasets/cache/cache_atom/*
+datasets/atom/my_test_datasets/cache/cache_itext2kg/*
+datasets/atom/my_test_datasets/cache/cache_graphiti/*
+datasets/atom/my_test_datasets/evaluation_results/*
