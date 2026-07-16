@@ -22,3 +22,15 @@ sbatch \
   --partition="$PARTITION" \
   --export=ALL,MODEL_POSTFIX="$MODEL_POSTFIX" \
   eval_exhaustivity.sh
+
+# Latency
+sbatch \
+  --nodes="$NODES" \
+  --ntasks="$NTASKS" \
+  --cpus-per-task="$CPUS_PER_TASK" \
+  --mem="$MEM" \
+  --gres="$GRES" \
+  --time="$TIME" \
+  --partition="$PARTITION" \
+  --export=ALL,MODEL_POSTFIX="$MODEL_POSTFIX" \
+  eval_latency.sh

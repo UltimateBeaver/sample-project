@@ -55,7 +55,7 @@ echo "Launching Neo4j container via Apptainer..."
 # Set the database username/password matching your .env configurations
 export APPTAINERENV_NEO4J_AUTH="neo4j/password"
 mkdir -p $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs
-apptainer run --writable-tmpfs --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs ./neo4j.sif &
+apptainer run --writable-tmpfs --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs $SCRATCH_FLASH/thesis-project/sample-project/neo4j.sif &
 NEO4J_PID=$!
 
 echo "Launching llama.cpp Model and Embedding Servers..."
@@ -77,13 +77,11 @@ export PYTHONPATH=$SCRATCH_FLASH/thesis-project/sample-project:$PYTHONPATH
 
 # Add the slurm config file to this scope (to get $MODEL_POSTFIX value)
 source ./_slurm_scripts/_slurm_config.env
-echo "Starting evaluation > Exhaustivity test"
-python ./exhaustivity/factoids_extraction_nyt.py -p $MODEL_POSTFIX
-python ./exhaustivity/quintuples_extraction_nyt.py -p $MODEL_POSTFIX
-python ./exhaustivity/quintuples_extraction_nyt_from_factoids.py -p $MODEL_POSTFIX
-# Print out results (json, png, PDF)
-python ./exhaustivity/plot_exhaustivity_factoids.py --force-recalculate
-python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
+echo "Starting evaluation > Latency test"
+python ./latency/testing_graphiti.py
+python ./latency/testing_atom.py
+python ./latency/testing_itex2kg.py
+python ./latency/latency_comparison.py
 
 # =========================================================================
 # 4. Graceful Cleanup of Background Services

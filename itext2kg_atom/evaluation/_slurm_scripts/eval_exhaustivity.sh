@@ -55,7 +55,7 @@ export PATH=$SCRATCH_FLASH/thesis-project/llama.cpp/build/bin:$PATH
 # # Set the database username/password matching your .env configurations
 # export APPTAINERENV_NEO4J_AUTH="neo4j/password"
 # mkdir -p $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs
-# apptainer run --writable-tmpfs --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs ./neo4j.sif &
+# apptainer run --writable-tmpfs --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs $SCRATCH_FLASH/thesis-project/sample-project/neo4j.sif &
 # NEO4J_PID=$!
 
 echo "Launching llama.cpp Model and Embedding Servers..."
