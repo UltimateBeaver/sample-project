@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=Evaluation_Latency
+#SBATCH --job-name=Evaluation_Pipeline
 #SBATCH --nodes=1                     # Request 1 compute node
 #SBATCH --ntasks=1                    # 1 main task execution
 #SBATCH --cpus-per-task=4             # Request 4 CPU cores for data processing
 #SBATCH --mem=32GB                    # Request 32 GB system memory
 #SBATCH --gres=gpu:2                  # Request 2 GPU (Required for Gemma 4)
-#SBATCH --time=0-8:00:00             # Max runtime (Hours: 8 hours)
+#SBATCH --time=0-23:59:00             # Max runtime (Hours: 24 hours)
 #SBATCH --partition=gpu_a40           # GPU partition on the cluster
-#SBATCH --output=logs/latency_stdout.log    # Standard output log file
-#SBATCH --error=logs/latency_stderr.log     # Standard error log file
+#SBATCH --output=logs/eval_pipeline_stdout.log    # Standard output log file
+#SBATCH --error=logs/eval_pipeline_stderr.log     # Standard error log file
 
 # =========================================================================
 # 1. Environment & Path Initialization
@@ -87,9 +87,9 @@ python ./exhaustivity/plot_exhaustivity_factoids.py --force-recalculate
 python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 
 echo "--- Running Latency Tests ---"
-python ./latency/testing_graphiti.py
+python ./latency/test_graphiti.py
 python ./latency/testing_atom.py
-python ./latency/testing_itex2kg.py
+python ./latency/testing_itext2kg.py
 python ./latency/latency_comparison.py
 
 echo "--- Running Quintuples Quality Tests ---"
