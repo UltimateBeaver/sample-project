@@ -4,30 +4,53 @@ Script to create a bar plot comparing latency between Graphiti and Atom.
 """
 
 import json
+import sys
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import numpy as np
 from pathlib import Path
 
+from env_config import (
+    eval_output_results_path, eval_cache_path
+)
+
+# Add the project root to Python path (same pattern as other scripts)
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+sys.path.append(str(project_root))
+
 # Global configuration
 MAX_BARS_TO_DISPLAY = 11  # Reduce number of bars for better readability
+CACHE_DIR = project_root / eval_cache_path
+GRAPHITI_JSON_PATH = CACHE_DIR / "cache_graphiti" / "batch_latency_graphiti.json"
+ATOM_JSON_PATH = CACHE_DIR / "cache_atom" / "batch_latency_atom.json"
+ITEXT2KG_JSON_PATH = CACHE_DIR / "cache_itext2kg" / "batch_latency_itext2kg.json"
+
+# Output configuration
+OUTPUT_PLOT_PNG = project_root / eval_output_results_path / "latency_comparison_plot.png"
+OUTPUT_PLOT_PDF = project_root / eval_output_results_path / "latency_comparison_plot.pdf"
+
+
 
 def load_graphiti_data(json_path):
     """Load and process Graphiti latency data."""
-    with open(json_path, 'r') as f:
-        data = json.load(f)
-    
     results = []
-    cumulative_latency = 0
-    
-    for batch in data['batch_results']:
-        if batch['status'] == 'success' and batch['execution_time_seconds'] is not None:
-            cumulative_latency += batch['execution_time_seconds']
-            results.append({
-                'total_factoids': batch['total_factoids_processed'],
-                'cumulative_latency_seconds': cumulative_latency
-            })
+    try:
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        
+        cumulative_latency = 0
+        
+        for batch in data['batch_results']:
+            if batch['status'] == 'success' and batch['execution_time_seconds'] is not None:
+                cumulative_latency += batch['execution_time_seconds']
+                results.append({
+                    'total_factoids': batch['total_factoids_processed'],
+                    'cumulative_latency_seconds': cumulative_latency
+                })
+    except Exception as e:
+        print(f"Could not load Graphiti latency json: {e}")
     
     return results
 
@@ -337,10 +360,10 @@ def main():
     """Main function to create the latency comparison plot."""
     
     # Define paths
-    graphiti_path = Path('evaluation/atom_baselines/batch_latency_graphiti.json')
-    atom_path = Path('evaluation/atom_baselines/batch_latency_atom.json')
-    itext2kg_path = Path('batch_cache_itext2kg/batch_latency_stats.json')
-    output_path = Path('evaluation/latency_comparison_plot.png')
+    graphiti_path = Path(GRAPHITI_JSON_PATH)
+    atom_path = Path(ATOM_JSON_PATH)
+    itext2kg_path = Path(ITEXT2KG_JSON_PATH)
+    output_path = Path(OUTPUT_PLOT_PNG)
     
     # Load data
     print("Loading Graphiti data...")
@@ -383,7 +406,7 @@ def main():
     print(f"Plot saved to: {output_path}")
     
     # Also save as PDF for publication
-    pdf_path = output_path.with_suffix('.pdf')
+    pdf_path = OUTPUT_PLOT_PDF
     fig.savefig(pdf_path, bbox_inches='tight', 
                 facecolor='white', edgecolor='none', format='pdf', pad_inches=0.1)
     print(f"PDF version saved to: {pdf_path}")

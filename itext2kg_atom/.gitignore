@@ -169,3 +169,6 @@ cython_debug/
 env/
 .vscode/
 .pytest_cache/
+
+datasets/atom/my_test_datasets/cache
+datasets/atom/my_test_datasets/evaluation_results

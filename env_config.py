@@ -54,6 +54,7 @@ translator_few_shot_seed =                  int(os.getenv("TRANSLATOR_FEW_SHOT_S
 eval_input_dataset_path =                   os.getenv("EVAL_INPUT_DATASET_PATH",            "./datasets/atom/my_test_datasets/dataset.pkl")
 eval_output_dataset_path =                  os.getenv("EVAL_OUTPUT_DATASET_PATH",           "./datasets/atom/my_test_datasets/dataset_with_factoids.pkl")
 eval_output_results_path =                  os.getenv("EVAL_OUTPUT_RESULTS_PATH",           "./datasets/atom/my_test_datasets/evaluation_results")
+eval_cache_path =                           os.getenv("EVAL_CACHE_PATH",                    "./datasets/atom/my_test_datasets/cache")
 eval_checkpoint_factoids_path =             os.getenv("EVAL_CHECKPOINT_FACTOIDS_PATH",      "./datasets/atom/my_test_datasets/factoids_checkpoint.json")
 eval_checkpoint_quintuples_path =           os.getenv("EVAL_CHECKPOINT_QUINTUPLES_PATH",    "./datasets/atom/my_test_datasets/quintuples_checkpoint.json")
 eval_model_postfixes_list =                 (os.getenv("EVAL_MODEL_POSTFIXES_LIST",          "_llamacpp_gemma4 _ollama_gemma4")).split(" ")

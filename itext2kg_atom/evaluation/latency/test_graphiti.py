@@ -4,6 +4,10 @@ Graphiti Latency Testing and Benchmarking
 
 This script measures the latency performance of the Graphiti knowledge graph construction system
 (a baseline approach) by processing batches of factoids and tracking timing metrics.
+
+Note: if you see some warnings at the end of the scripts about "" it's normal: 
+it's a Windows-specific issue in Python's default asynchronous event loop policy (WindowsProactorEventLoopPolicy)
+
 Usage:
     python test_graphiti.py
 """
@@ -12,6 +16,8 @@ import asyncio
 import ast
 import json
 import os
+from pathlib import Path
+import sys
 import time
 from datetime import datetime
 from typing import Dict, List, Any
@@ -20,27 +26,40 @@ import pandas as pd
 import dateparser
 from graphiti_core import Graphiti
 from graphiti_core.nodes import EpisodeType
+from graphiti_core.llm_client.openai_generic_client import OpenAIGenericClient
+from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
+from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 from graphiti_core.llm_client import OpenAIClient, LLMConfig
+
+from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    neo4j_uri, neo4j_username, neo4j_password,
+    provider_openai_max_elements_per_batch,
+    num_rows_to_process, column_name_date, column_name_factoids_ground_truth,
+    eval_input_dataset_path, eval_cache_path
+)
+
+# Add the project root to Python path (same pattern as other scripts)
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+sys.path.append(str(project_root))
 
 # =============================================================================
 # CONFIGURATION - MODIFY THESE VARIABLES AS NEEDED
 # =============================================================================
 
-os.environ["OPENAI_API_KEY"] = "###"
-os.environ["NEO4J_PASSWORD"] = "###"
 # Dataset configuration
-DATASET_PATH = "datasets/nyt_news/2020_nyt_COVID_last_version_ready_quintuples_gpt41_from_factoids_run3_run3.pkl"
-FACTOIDS_COL = "factoids_g_truth"
-DATE_COL = "date"
+DATASET_PATH = project_root / eval_input_dataset_path
+FACTOIDS_COL = column_name_factoids_ground_truth
+DATE_COL = column_name_date
 
 # Processing configuration
-BATCH_SIZE = 40
+BATCH_SIZE = provider_openai_max_elements_per_batch
 
 # Output configuration
-OUTPUT_FILE = "batch_latency_results.json"
+CACHE_DIR = project_root / eval_cache_path / "cache_graphiti"
+OUTPUT_FILE = CACHE_DIR / "batch_latency_graphiti.json"
 
-# Database configuration (optional - can also use environment variables)
-NEO4J_PASSWORD = None  # Set to your password or leave None to use environment variable
 
 # =============================================================================
 # END CONFIGURATION
@@ -197,28 +216,47 @@ def setup_graphiti() -> Graphiti:
         Configured Graphiti instance
     """
     # Check for OpenAI API key
-    if not os.getenv("OPENAI_API_KEY"):
-        raise ValueError("OPENAI_API_KEY environment variable not set")
+    # if not os.getenv("OPENAI_API_KEY"):
+    #     raise ValueError("OPENAI_API_KEY environment variable not set")
     
     # Configure LLM
-    llm_config = LLMConfig(
-        model="gpt-4.1-2025-04-14",  # Using a more standard model name
-        temperature=0.0,
-        max_tokens=None,
-    )
+    # llm_config = LLMConfig(
+    #     model="gpt-4.1-2025-04-14",  # Using a more standard model name
+    #     temperature=0.0,
+    #     max_tokens=None,
+    # )
     
     # Initialize OpenAI client
-    llm_client = OpenAIClient(config=llm_config)
+    default_llm_langchain = get_default_model()
+    default_embedding_langchain = get_default_embedding_model()
+
+    llm_config = LLMConfig(
+        api_key=default_llm_langchain.openai_api_key,  # Local models do not require a real API key, but some placeholder is needed
+        model=default_llm_langchain.model_name,
+        small_model=default_llm_langchain.model_name,
+        base_url=default_llm_langchain.openai_api_base,  # Local OpenAI-compatible endpoint
+        temperature=default_llm_langchain.temperature,
+    )
+    llm_client = OpenAIGenericClient(config=llm_config, structured_output_mode='json_schema')
     
     # Determine password to use
-    password = NEO4J_PASSWORD if NEO4J_PASSWORD is not None else os.getenv("NEO4J_PASSWORD", "neo4j")
     
     # Initialize Graphiti with Neo4j connection
     graphiti = Graphiti(
-        uri="bolt://localhost:7687",
-        user="neo4j",
-        password=password,
-        llm_client=llm_client
+        uri=neo4j_uri,
+        user=neo4j_username,
+        password=neo4j_password,
+        llm_client=llm_client,
+        embedder=OpenAIEmbedder(
+            config=OpenAIEmbedderConfig(
+                #api_key=default_embedding_langchain.openai_api_key,  # Placeholder API key
+                api_key="###",  # Placeholder API key
+                embedding_model=default_embedding_langchain.model,
+                #embedding_dim=768,
+                base_url=default_embedding_langchain.openai_api_base,
+            )
+        ),
+        cross_encoder=OpenAIRerankerClient(client=llm_client, config=llm_config),
     )
     
     return graphiti
@@ -271,15 +309,18 @@ async def main():
         # Load dataset
         print(f"\nLoading dataset from {DATASET_PATH}...")
         
-        if DATASET_PATH.endswith('.csv'):
+        if str(DATASET_PATH).endswith('.csv'):
             df = pd.read_csv(DATASET_PATH)
-        elif DATASET_PATH.endswith(('.xlsx', '.xls')):
+        elif str(DATASET_PATH).endswith(('.xlsx', '.xls')):
             df = pd.read_excel(DATASET_PATH)
-        elif DATASET_PATH.endswith('.pkl'):
+        elif str(DATASET_PATH).endswith('.pkl'):
             df = pd.read_pickle(DATASET_PATH)
         else:
             raise ValueError("Unsupported file format. Use CSV, Excel, or Pickle files.")
         
+        if num_rows_to_process > 0:
+            df = df.head(num_rows_to_process)
+
         print(f"Dataset loaded: {len(df)} rows")
         
         # Validate columns

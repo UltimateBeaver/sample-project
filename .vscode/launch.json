@@ -9,6 +9,9 @@
             "console": "integratedTerminal",
             "args": ["-p", "llamacpp_gemma4"],
             "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/venv"
+            },
             "justMyCode": true
         },
         {

@@ -41,6 +41,7 @@ EVAL_BASE_PATH=./datasets/atom/my_test_datasets
 EVAL_INPUT_DATASET_PATH="${EVAL_BASE_PATH}/dataset_input.pkl"
 EVAL_OUTPUT_DATASET_PATH="${EVAL_BASE_PATH}/dataset_output.pkl"
 EVAL_OUTPUT_RESULTS_PATH="${EVAL_BASE_PATH}/evaluation_results"
+EVAL_CACHE_PATH="${EVAL_BASE_PATH}/cache"
 EVAL_CHECKPOINT_FACTOIDS_PATH="${EVAL_BASE_PATH}/factoids_checkpoint.json"
 EVAL_CHECKPOINT_QUINTUPLES_PATH="${EVAL_BASE_PATH}/quintuples_checkpoint.json"
 ```
@@ -98,6 +99,17 @@ python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 | Factoids Temporal Recall   | avg(f_recall_t) | Same as semantic, but for each factoid, check if t_start and t_end of g_truth and preduction temporally overlaps                                                                                                                                                    |
 | Quintuples Semantic Recall | avg(q_recall)   | `similarity_matrix = cosine_similarity(quintuple_embeddings, gold_quintuple_embeddings)`. <br> Greedy match: for each quintuple, look for the g_truth with highest similarity, greater than a threshold (default=0.7) in the corresponding row of similarity_matrix |
 | Quintuples Temporal Recall | avg(q_recall_t) | Same as semantic, but for each quintuple, check if t_start and t_end of g_truth and prediction matches, through dateparser.                                                                                                                                         |
+
+---
+### Latency (ATOM and itext2kg)
+Execute the following commands to record the latency of ATOM, itext2kg and Graphiti frameworks and plot a comparison chart. <br> Make sure your **neo4j container is running**, for Graphiti!
+```bash
+pip install graphiti_core
+python ./latency/testing_graphiti.py
+python ./latency/testing_atom.py
+python ./latency/testing_itex2kg.py
+python ./latency/latency_comparison.py
+```
 
 ---
 

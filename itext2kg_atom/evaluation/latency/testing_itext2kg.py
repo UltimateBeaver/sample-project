@@ -15,49 +15,45 @@ Output:
     - Processing logs and timing information
 """
 
+import ast
 import os
 import pickle
 import json
+import sys
 import time
 import asyncio
 import logging
+import pandas as pd
 from datetime import datetime
+from pathlib import Path
 from typing import Tuple, Optional
 from itext2kg import iText2KG
 from itext2kg.atom.models import KnowledgeGraph
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-
-# Global Parameters - Modify these as needed
-CACHE_DIR = "./batch_cache_itext2kg"
-BATCH_SIZE = 40
-ENT_THRESHOLD = 0.8
-REL_THRESHOLD = 0.7
-MAX_WORKERS = 8
-
-# OpenAI Configuration
-OPENAI_API_KEY = "###"
-
-# Initialize LLM and Embeddings models
-openai_llm_model = ChatOpenAI(
-    api_key=OPENAI_API_KEY,
-    model="gpt-4.1-2025-04-14",
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
+from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    provider_openai_max_elements_per_batch, num_rows_to_process, column_name_date, column_name_factoids_ground_truth,
+    eval_input_dataset_path, eval_cache_path
 )
 
-openai_embeddings_model = OpenAIEmbeddings(
-    api_key=OPENAI_API_KEY,
-    model="text-embedding-3-large",
-)
-
-# Data file path
-DATA_FILE_PATH = "/Users/yassirlairgi/Developer/Projects/ATOM_Article/evaluation/2020-covid-news_factoids.pkl"
+# Add the project root to Python path (same pattern as other scripts)
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+sys.path.append(str(project_root))
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Global Parameters - Modify these as needed
+CACHE_DIR = project_root / eval_cache_path / "cache_itext2kg"
+BATCH_SIZE = provider_openai_max_elements_per_batch
+ENT_THRESHOLD = 0.8
+REL_THRESHOLD = 0.7
+MAX_WORKERS = 8
+
+# Data file path
+DATA_FILE_PATH = project_root / eval_input_dataset_path
+OUTPUT_JSON_PATH = CACHE_DIR / "batch_latency_itext2kg.json"
 
 
 def find_last_completed_batch(cache_dir: str) -> Tuple[int, Optional[KnowledgeGraph]]:
@@ -122,7 +118,7 @@ def load_existing_latency_stats(cache_dir: str) -> list:
     Returns:
         List of existing latency statistics, or empty list if none found
     """
-    latency_path = os.path.join(cache_dir, 'batch_latency_stats.json')
+    latency_path = OUTPUT_JSON_PATH
     
     # Try to load existing stats file first
     if os.path.exists(latency_path):
@@ -442,7 +438,7 @@ async def batch_build_graph_itext2kg(itext2kg_instance,
             
             # 💾 SAVE INCREMENTAL BATCH STATISTICS after each successful batch
             if cache_dir:
-                latency_path = os.path.join(cache_dir, 'batch_latency_stats.json')
+                latency_path = OUTPUT_JSON_PATH
                 with open(latency_path, 'w') as f:
                     json.dump(latency_stats, f, indent=2)
                 logger.info(f"📊 Updated latency statistics with batch {actual_batch_idx}")
@@ -474,7 +470,7 @@ async def batch_build_graph_itext2kg(itext2kg_instance,
     
     # Save latency statistics (this will include both existing and new stats)
     if cache_dir:
-        latency_path = os.path.join(cache_dir, 'batch_latency_stats.json')
+        latency_path = OUTPUT_JSON_PATH
         with open(latency_path, 'w') as f:
             json.dump(latency_stats, f, indent=2)
         logger.info(f"📊 Saved complete latency statistics to {latency_path}")
@@ -489,17 +485,25 @@ async def batch_build_graph_itext2kg(itext2kg_instance,
     
     return current_kg
 
-
 def load_covid_data():
     """Load the COVID-19 factoids data from pickle file and flatten into a list."""
     try:
-        with open(DATA_FILE_PATH, 'rb') as f:
-            data = pickle.load(f)
+        data = pd.read_pickle(DATA_FILE_PATH)
+        if num_rows_to_process > 0:
+            data = data.head(num_rows_to_process)
+        
+        if isinstance(data[column_name_factoids_ground_truth][0], str):
+            data[column_name_factoids_ground_truth] = data[column_name_factoids_ground_truth].apply(lambda x:ast.literal_eval(x))   
         
         # Flatten the data structure (dict of dates -> list of facts) into a single list
         all_facts = []
-        for date, facts in data.items():
-            all_facts.extend(facts)
+        all_facts = [
+            factoid
+            for sublist in data[column_name_factoids_ground_truth].dropna()
+            for factoid in sublist
+        ]
+        # for date, facts in data.items():
+        #     all_facts.extend(facts)
         
         logger.info(f"Loaded data with {len(data)} dates from {DATA_FILE_PATH}")
         logger.info(f"Total facts: {len(all_facts)}")
@@ -522,7 +526,7 @@ async def run_itext2kg_batch_processing():
         return None
     
     # Initialize iText2KG instance
-    itext2kg_instance = iText2KG(llm_model=openai_llm_model, embeddings_model=openai_embeddings_model)
+    itext2kg_instance = iText2KG(llm_model=get_default_model(), embeddings_model=get_default_embedding_model())
     
     logger.info("Starting iText2KG batch processing...")
     logger.info(f"Total facts in dataset: {len(all_facts)}")
@@ -552,8 +556,8 @@ if __name__ == "__main__":
     print(f"  ENT_THRESHOLD: {ENT_THRESHOLD}")
     print(f"  REL_THRESHOLD: {REL_THRESHOLD}")
     print(f"  DATA_FILE: {DATA_FILE_PATH}")
-    print(f"  LLM Model: {openai_llm_model.model_name}")
-    print(f"  Embeddings Model: {openai_embeddings_model.model}")
+    print(f"  LLM Model: {get_default_model().model_name}")
+    print(f"  Embeddings Model: {get_default_embedding_model().model}")
     print("="*50)
     
     # Run the batch processing

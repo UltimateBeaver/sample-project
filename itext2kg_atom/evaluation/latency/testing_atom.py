@@ -15,51 +15,48 @@ Output:
     - Processing logs and timing information
 """
 
+import ast
 import os
 import pickle
 import json
+import sys
 import time
 import asyncio
 import logging
+import pandas as pd
 from datetime import datetime
+from pathlib import Path
 from typing import Tuple, Optional
 from itext2kg import Atom
 from itext2kg.atom.models import KnowledgeGraph
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    provider_openai_max_elements_per_batch, num_rows_to_process, column_name_date, column_name_factoids_ground_truth,
+    eval_input_dataset_path, eval_cache_path
+)
+
+# Add the project root to Python path (same pattern as other scripts)
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+sys.path.append(str(project_root))
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Global Parameters - Modify these as needed
-CACHE_DIR = "./batch_cache_atom_v2"
-BATCH_SIZE = 40
+CACHE_DIR = project_root / eval_cache_path / "cache_atom"
+BATCH_SIZE = provider_openai_max_elements_per_batch
 ENT_THRESHOLD = 0.8
 REL_THRESHOLD = 0.7
 ENTITY_NAME_WEIGHT = 0.8
 ENTITY_LABEL_WEIGHT = 0.2
 MAX_WORKERS = 8
 
-# OpenAI Configuration
-OPENAI_API_KEY = "###"
-
-# Initialize LLM and Embeddings models
-openai_llm_model = ChatOpenAI(
-    api_key=OPENAI_API_KEY,
-    model="gpt-4.1-2025-04-14",
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
-)
-
-openai_embeddings_model = OpenAIEmbeddings(
-    api_key=OPENAI_API_KEY,
-    model="text-embedding-3-large",
-)
-
 # Data file path
-DATA_FILE_PATH = "/Users/yassirlairgi/Developer/Projects/ATOM_Article/evaluation/2020-covid-news_factoids.pkl"
+DATA_FILE_PATH = project_root / eval_input_dataset_path
+OUTPUT_JSON_PATH = CACHE_DIR / "batch_latency_atom.json"
 
-# Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 
 def find_last_completed_batch(cache_dir: str) -> Tuple[int, Optional[KnowledgeGraph]]:
@@ -124,7 +121,7 @@ def load_existing_latency_stats(cache_dir: str) -> list:
     Returns:
         List of existing latency statistics, or empty list if none found
     """
-    latency_path = os.path.join(cache_dir, 'batch_latency_stats.json')
+    latency_path = OUTPUT_JSON_PATH
     
     # Try to load existing stats file first
     if os.path.exists(latency_path):
@@ -478,7 +475,7 @@ async def batch_build_graph_from_different_obs_times(atom_instance,
             
             # 💾 SAVE INCREMENTAL BATCH STATISTICS after each successful batch
             if cache_dir:
-                latency_path = os.path.join(cache_dir, 'batch_latency_stats.json')
+                latency_path = OUTPUT_JSON_PATH
                 with open(latency_path, 'w') as f:
                     json.dump(latency_stats, f, indent=2)
                 logger.info(f"📊 Updated latency statistics with batch {actual_batch_idx}")
@@ -510,7 +507,7 @@ async def batch_build_graph_from_different_obs_times(atom_instance,
     
     # Save latency statistics (this will include both existing and new stats)
     if cache_dir:
-        latency_path = os.path.join(cache_dir, 'batch_latency_stats.json')
+        latency_path = OUTPUT_JSON_PATH
         with open(latency_path, 'w') as f:
             json.dump(latency_stats, f, indent=2)
         logger.info(f"📊 Saved complete latency statistics to {latency_path}")
@@ -525,14 +522,27 @@ async def batch_build_graph_from_different_obs_times(atom_instance,
     
     return current_kg
 
+# Define a helper function to convert the dataframe's atomic facts into a dictionary,
+# where keys are observation dates and values are the combined list of atomic facts for that date.
+def to_dictionary(df:pd.DataFrame, column_name_atomic_facts: str): 
+
+    if isinstance(df[column_name_atomic_facts][0], str):
+        df[column_name_atomic_facts] = df[column_name_atomic_facts].apply(lambda x:ast.literal_eval(x))    
+    grouped_df = df.groupby(column_name_date)[column_name_atomic_facts].sum().reset_index()
+    return {
+        str(date): factoids for date, factoids in grouped_df.set_index(column_name_date)[column_name_atomic_facts].to_dict().items()
+        }
 
 def load_covid_data():
     """Load the COVID-19 factoids data from pickle file."""
     try:
-        with open(DATA_FILE_PATH, 'rb') as f:
-            data = pickle.load(f)
+        data = pd.read_pickle(DATA_FILE_PATH)
+        if num_rows_to_process > 0:
+            data = data.head(num_rows_to_process)
         logger.info(f"Loaded data with {len(data)} dates from {DATA_FILE_PATH}")
-        return data
+
+        formatted_data = to_dictionary(data, column_name_factoids_ground_truth)
+        return formatted_data
     except Exception as e:
         logger.error(f"Error loading data from {DATA_FILE_PATH}: {e}")
         return {}
@@ -551,7 +561,7 @@ async def run_covid_batch_processing():
         return None
     
     # Initialize ATOM instance
-    atom_instance = Atom(llm_model=openai_llm_model, embeddings_model=openai_embeddings_model)
+    atom_instance = Atom(llm_model=get_default_model(), embeddings_model=get_default_embedding_model())
     
     logger.info("Starting COVID-19 batch processing...")
     logger.info(f"Total dates in dataset: {len(atomic_facts_with_obs_timestamps)}")
@@ -586,8 +596,8 @@ if __name__ == "__main__":
     print(f"  REL_THRESHOLD: {REL_THRESHOLD}")
     print(f"  MAX_WORKERS: {MAX_WORKERS}")
     print(f"  DATA_FILE: {DATA_FILE_PATH}")
-    print(f"  LLM Model: {openai_llm_model.model_name}")
-    print(f"  Embeddings Model: {openai_embeddings_model.model}")
+    print(f"  LLM Model: {get_default_model().model_name}")
+    print(f"  Embeddings Model: {get_default_embedding_model().model}")
     print("="*50)
     
     # Run the batch processing
