@@ -104,7 +104,6 @@ python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 ### Latency (ATOM and itext2kg)
 Execute the following commands to record the latency of ATOM, itext2kg and Graphiti frameworks and plot a comparison chart. <br> Make sure your **neo4j container is running**, for Graphiti!
 ```bash
-pip install graphiti_core
 python ./latency/testing_graphiti.py
 python ./latency/testing_atom.py
 python ./latency/testing_itex2kg.py

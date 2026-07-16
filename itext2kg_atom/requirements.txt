@@ -44,3 +44,6 @@ pytest-asyncio>=1.1.0,<2.0.0
 
 # Mathplot for evaluating results
 matplotlib
+
+# Graphiti framework for evaluation comparison between ATOM and itext2kg
+graphiti_core
