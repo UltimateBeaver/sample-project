@@ -76,7 +76,7 @@ If you are going to execute these tests on **HPC POLITO CLUSTER**, move to the `
 
 ```bash
 cd _slurm_scripts
-chmod +x ./eval_exhaustivity.sh
+chmod +x ./eval_pipeline.sh
 chmod +x start_evaluation_wrapper.sh && ./start_evaluation_wrapper.sh
 ```
 
