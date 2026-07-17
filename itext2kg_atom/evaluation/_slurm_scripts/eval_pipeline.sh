@@ -129,13 +129,22 @@ kill $NEO4J_PID
 # Stop both detached llama-server instances (ports 8080 and 8081)
 pkill llama-server
 
+# Move back to the root directory
+cd $SCRATCH_FLASH/thesis-project/sample-project
+
 # Export the generated Knowledge Graphs using neo4j-admin image
 # apptainer exec \
 #     --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data \
 #     docker://neo4j:latest \
 #     neo4j-admin database dump neo4j --to-path=/data --overwrite-destination=true
 
-# Copy modified files on $SCRATCH_FLASH back to $HOME
-rsync -av --exclude '.git' --exclude 'venv' $SCRATCH_FLASH/thesis-project/sample-project/ $HOME/thesis-project/sample-project/
+# Copy modified files on $SCRATCH_FLASH back to $HOME, but exclude the massive database binary folders
+rsync -av \
+  --exclude '.git' \
+  --exclude 'venv' \
+  --exclude 'neo4j/data' \
+  --exclude 'neo4j/logs' \
+  $SCRATCH_FLASH/thesis-project/sample-project/ \
+  $HOME/thesis-project/sample-project/
 
 echo "Job completed successfully!"
