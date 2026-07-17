@@ -34,7 +34,14 @@ fi
 # mkdir -p $SCRATCH_FLASH/thesis-project
 # cp -r $HOME/thesis-project/sample-project $SCRATCH_FLASH/thesis-project
 echo "Syncing required project files from $HOME to $SCRATCH_FLASH..."
-rsync -av --exclude='.git' --exclude='logs' --exclude='itext2kg_atom/evaluation/_slurm_scripts/logs' \
+rsync -av \
+  --exclude='.git' \
+  --exclude='logs' \
+  --exclude='itext2kg_atom/evaluation/_slurm_scripts/logs' \
+  --exclude='neo4j/data' \
+  --exclude='neo4j/logs' \
+  $HOME/thesis-project/sample-project/ \
+  $SCRATCH_FLASH/thesis-project/sample-project/
 $HOME/thesis-project/sample-project/ \
 $SCRATCH_FLASH/thesis-project/sample-project/
 
@@ -51,11 +58,19 @@ export PATH=$SCRATCH_FLASH/thesis-project/llama.cpp/build/bin:$PATH
 # =========================================================================
 # 2. Launch Background Infrastructure Services
 # =========================================================================
+# Re-create directories and wipe any residual artifacts from previous dirty runs
+echo "Cleaning directories for Neo4j..."
+mkdir -p neo4j/data neo4j/logs
+rm -rf neo4j/data/*
+rm -rf neo4j/logs/*
 echo "Launching Neo4j container via Apptainer..."
 # Set the database username/password matching your .env configurations
 export APPTAINERENV_NEO4J_AUTH="neo4j/password"
 mkdir -p $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs
-apptainer run --writable-tmpfs --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs $SCRATCH_FLASH/thesis-project/sample-project/neo4j.sif &
+apptainer run --writable-tmpfs \
+    --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data \
+    --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs \
+    $SCRATCH_FLASH/thesis-project/sample-project/neo4j.sif &
 NEO4J_PID=$!
 
 echo "Launching llama.cpp Model and Embedding Servers..."
