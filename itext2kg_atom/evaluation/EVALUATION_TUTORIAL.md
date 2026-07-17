@@ -50,35 +50,34 @@ EVAL_CHECKPOINT_QUINTUPLES_PATH="${EVAL_BASE_PATH}/quintuples_checkpoint.json"
 
 ## Execute the tests
 
-The updated dataset will be saved into `dataset_output.pkl` and the the tests results will be saved into `${EVAL_BASE_PATH}/evaluation_results`.  
-Open up a terminal and do:
+The updated dataset will be saved into `dataset_output.pkl` and the the tests results will be saved into `${EVAL_BASE_PATH}/evaluation_results`.
 
-```
-# if you are using llama.cpp backend
-start-llama-servers
-# else, make sure you have your models backend up and running!
+- If you are executing these tests on **HPC POLITO CLUSTER**: move to the `_slurm_scripts` directory and execute each script.
+  <br> Remember to edit the **_slurm_env_config** file according to your current architecture you want to test. If some cluster config is missing, the default value will be applied, inside the single test script, through `#SBATCH` directive. Execute the following commands to run the whole tests pipeline.
+  ```bash
+  cd _slurm_scripts
+  chmod +x ./eval_pipeline.sh
+  chmod +x start_eval_pipeline_wrapper.sh && ./start_eval_pipeline_wrapper.sh
+  ```
 
-#### Needed for graphiti_latency test ####
-# if you are using Neo4j inside Docker
-docker compose up -d
-# else if you are using Neo4j inside Apptainer
+- If you are executing these tests on **YOUR LOCAL MACHINE**:
+  ```bash
+  # if you are using llama.cpp backend
+  start-llama-servers
+  # else, make sure you have your models backend up and running!
+
+  #### Needed for graphiti_latency test ####
+  # if you are using Neo4j inside Docker
+  docker compose up -d
+  # else, make sure your neo4j backend is running!
 
 
-cd itext2kg_atom/evaluation
-```
+  cd itext2kg_atom/evaluation
+  # Then copy paste the exact commands in the following sections
+  ```
 
 Open up [models.py](../../models/models.py) and check if its functions return your desired llm model and embedding model. If no, check out [models_config.py](../../models/models_config.py).  
 <br> Depending on which model and backend you are going to use, you shoud edit the `EVAL_MODEL_POSTFIXES_LIST` and `EVAL_MODEL_POSTFIXES_TO_PLOT_LIST` env vars accordingly.
-<br>
-
-If you are going to execute these tests on **HPC POLITO CLUSTER**, move to the `_slurm_scripts` directory and execute each script. That will allow to send multiple jobs in parallel.
-<br> Remember to edit the **_slurm_env_config** file according to your current architecture you want to test. If some cluster config is missing, the default value will be applied, inside the single test script, through `#SBATCH` directive
-
-```bash
-cd _slurm_scripts
-chmod +x ./eval_pipeline.sh
-chmod +x start_eval_pipeline_wrapper.sh && ./start_eval_pipeline_wrapper.sh
-```
 
 ---
 

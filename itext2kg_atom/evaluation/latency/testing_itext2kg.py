@@ -54,6 +54,7 @@ MAX_WORKERS = 8
 # Data file path
 DATA_FILE_PATH = project_root / eval_input_dataset_path
 OUTPUT_JSON_PATH = CACHE_DIR / "batch_latency_itext2kg.json"
+Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
 
 def find_last_completed_batch(cache_dir: str) -> Tuple[int, Optional[KnowledgeGraph]]:

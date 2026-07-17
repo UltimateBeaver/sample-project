@@ -59,6 +59,7 @@ BATCH_SIZE = provider_openai_max_elements_per_batch
 # Output configuration
 CACHE_DIR = project_root / eval_cache_path / "cache_graphiti"
 OUTPUT_FILE = CACHE_DIR / "batch_latency_graphiti.json"
+Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
 
 # =============================================================================
