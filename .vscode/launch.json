@@ -10,7 +10,7 @@
             "args": ["-p", "llamacpp_gemma4"],
             "envFile": "${workspaceFolder}/.env",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/venv"
+                "PYTHONPATH": "${workspaceFolder};${workspaceFolder}/itext2kg_atom;${workspaceFolder}/venv"
             },
             "justMyCode": true
         },

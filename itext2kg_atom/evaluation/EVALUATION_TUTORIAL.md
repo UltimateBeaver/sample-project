@@ -53,28 +53,35 @@ EVAL_CHECKPOINT_QUINTUPLES_PATH="${EVAL_BASE_PATH}/quintuples_checkpoint.json"
 The updated dataset will be saved into `dataset_output.pkl` and the the tests results will be saved into `${EVAL_BASE_PATH}/evaluation_results`.
 
 - If you are executing these tests on **HPC POLITO CLUSTER**: move to the `_slurm_scripts` directory and execute each script.
-  <br> Remember to edit the **_slurm_env_config** file according to your current architecture you want to test. If some cluster config is missing, the default value will be applied, inside the single test script, through `#SBATCH` directive. Execute the following commands to run the whole tests pipeline.
-  ```bash
-  cd _slurm_scripts
-  chmod +x ./eval_pipeline.sh
-  chmod +x start_eval_pipeline_wrapper.sh && ./start_eval_pipeline_wrapper.sh
-  ```
+  <br> Remember to edit the **\_slurm_env_config** file according to your current architecture you want to test. If some cluster config is missing, the default value will be applied, inside the single test script, through `#SBATCH` directive. Execute the following commands to run the whole tests pipeline.
+
+    ```bash
+    cd itext2kg_atom/evaluation/_slurm_scripts
+    chmod +x ./eval_pipeline.sh
+    chmod +x start_eval_pipeline_wrapper.sh && ./start_eval_pipeline_wrapper.sh
+    ```
 
 - If you are executing these tests on **YOUR LOCAL MACHINE**:
-  ```bash
-  # if you are using llama.cpp backend
-  start-llama-servers
-  # else, make sure you have your models backend up and running!
 
-  #### Needed for graphiti_latency test ####
-  # if you are using Neo4j inside Docker
-  docker compose up -d
-  # else, make sure your neo4j backend is running!
+    ```bash
+    # delete any existing results to start fresh
+    # This is crucial for having correct results when changing $NUM_ROWS_TO_PROCESS env var.
+    rm -r $EVAL_OUTPUT_DATASET_PATH
+    rm -r $EVAL_OUTPUT_RESULTS_PATH
+
+    # if you are using llama.cpp backend
+    start-llama-servers
+    # else, make sure you have your models backend up and running!
+
+    #### Needed for graphiti_latency test ####
+    # if you are using Neo4j inside Docker
+    docker compose up -d
+    # else, make sure your neo4j backend is running!
 
 
-  cd itext2kg_atom/evaluation
-  # Then copy paste the exact commands in the following sections
-  ```
+    cd itext2kg_atom/evaluation
+    # Then copy paste the exact commands in the following sections
+    ```
 
 Open up [models.py](../../models/models.py) and check if its functions return your desired llm model and embedding model. If no, check out [models_config.py](../../models/models_config.py).  
 <br> Depending on which model and backend you are going to use, you shoud edit the `EVAL_MODEL_POSTFIXES_LIST` and `EVAL_MODEL_POSTFIXES_TO_PLOT_LIST` env vars accordingly.
@@ -116,8 +123,11 @@ python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 | Quintuples Temporal Recall | avg(q_recall_t) | Same as semantic, but for each quintuple, check if t_start and t_end of g_truth and prediction matches, through dateparser.                                                                                                                                         |
 
 ---
+
 ### Latency (ATOM, itext2kg and Graphiti)
+
 Execute the following commands to record the latency of ATOM, itext2kg and Graphiti frameworks and plot a comparison chart. <br> Make sure your **neo4j container is running**, for Graphiti!
+
 ```bash
 python ./latency/testing_graphiti.py
 python ./latency/testing_atom.py
@@ -126,6 +136,28 @@ python ./latency/plot_latency_comparison.py
 ```
 
 The chart shows the number of factoids on the X axis and the total processing hours on the Y axis.
+
+---
+
+### Merge (ATOM, itext2kg and Graphiti)
+
+Execute the following commands to analyze the merge performances of ATOM, Itext2kg and Graphiti frameworks. <br> Make sure your **EVAL_INPUT_KNOWLEDGE_GRAPH_PATH** contains the correct knowledge graph file, coherent with the **EVAL_INPUT_DATASET_PATH**, otherwise these scripts will produce wrong results!
+
+```bash
+python ./merge/evaluate_atom_merge.py
+python ./merge/evaluate_itext2kg_merge.py
+```
+
+| Output metric name | Formula                                                                          | Description                                                                                  |
+| ------------------ | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| ER Precision       | $1 - \frac{len(similar\ nodes)}{Nentities\ ground\ truth - Nentities\ atom}$ | Measures quality: Of all the merges performed by the system, how many were actually correct? |
+| ER Recall          | $1 - \frac{len(similar\ nodes)}{ground\ truth\ merged}$                          | Measures coverage: how well ATOM is merging entities compared to ground truth                |
+| ER F1-Score        | $2*\frac{P*R}{P+R}$                                                              | The harmonic mean of Precision and Recall, providing a single balanced performance score     |
+| RR Precision       | -                                                                                | Same as ER Precision, but applied to relationship labels                                     |
+| RR Recall          | -                                                                                | Same as ER Recall, but applied to relationship labels                                        |
+| RR F1-Score        | -                                                                                | Same as ER F1-Score, but applied to relationship labels                                      |
+
+This test evaluate the frameworks ability to remove duplicate nodes or relationships. It does NOT evaluate omitted quintuples or their structural accuracy: such metrics are evaluated by the Exhaustivity scripts.
 
 ---
 
@@ -186,19 +218,20 @@ This test evaluates the quintuples extraction stability in two cases:
 
 Please note that the similarity metric can still be high even when the two runs produce very different numbers of quintuples. <br> Let's assume that for a row we have 1 quintuple from run1 and 5 quintuples run2: even if one run emits only one quintuple, that single quintuple can still be semantically very close to one of the quintuples from the other run, so **the similarity can look high**
 
-| Output metric name        | Formula                | Description                                                                                                                                                                                                                                                                        |
-| ------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `total_count`             | count(quintuples)      | How many quintuples have been produced in each run                                                                                                                                                                                                                                 |
-| `mean_count`              | -                      | Average quintuples count in each run                                                                                                                                                                                                                                               |
-| `std_count`               | -                      | Standard deviation of quintuples count in each run                                                                                                                                                                                                                                 |
-| `similarity`         | avg(max_similarities)  | `similarity_matrix = cosine_similarity(embeddings_run1, embeddings_run2)`. <br> Greedy match: for each quintuple in run1, select the quintuple from run2 with the highest similarity in the corresponding row of similarity_matrix. Then compute the mean similarity, for each row |
-| `overall_mean_similarity` | avg(similarity_matrix) | Compute the average similarity across the whole similarity_matrix, for each row                                                                                                                                                                                                    |
-| `jaccard_similarity` | $\frac{\mid A \cap B \mid}{\mid A \cup B \mid}$ | Let `A` and `B` be respectively the set of quintuples in run1 and run2. Compute the similarity_matrix, and select the best matches for each quintuple in run1 and run2. Then compute the Jaccard similarity, for each row |
-| Aggregated metrics        | -                      | Mean, Standard Deviation, Min, Max, Median across the whole dataset `similarity` and `jaccard_similarity`                                                                                                                                                                                              |
+| Output metric name        | Formula                                         | Description                                                                                                                                                                                                                                                                        |
+| ------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `total_count`             | count(quintuples)                               | How many quintuples have been produced in each run                                                                                                                                                                                                                                 |
+| `mean_count`              | -                                               | Average quintuples count in each run                                                                                                                                                                                                                                               |
+| `std_count`               | -                                               | Standard deviation of quintuples count in each run                                                                                                                                                                                                                                 |
+| `similarity`              | avg(max_similarities)                           | `similarity_matrix = cosine_similarity(embeddings_run1, embeddings_run2)`. <br> Greedy match: for each quintuple in run1, select the quintuple from run2 with the highest similarity in the corresponding row of similarity_matrix. Then compute the mean similarity, for each row |
+| `overall_mean_similarity` | avg(similarity_matrix)                          | Compute the average similarity across the whole similarity_matrix, for each row                                                                                                                                                                                                    |
+| `jaccard_similarity`      | $\frac{\mid A \cap B \mid}{\mid A \cup B \mid}$ | Let `A` and `B` be respectively the set of quintuples in run1 and run2. Compute the similarity_matrix, and select the best matches for each quintuple in run1 and run2. Then compute the Jaccard similarity, for each row                                                          |
+| Aggregated metrics        | -                                               | Mean, Standard Deviation, Min, Max, Median across the whole dataset `similarity` and `jaccard_similarity`                                                                                                                                                                          |
 
 ---
 
 ## Costs (only meaningful if you want to use payment APIs as backend infrastructure)
+
 Required columns from `dataset_output.pkl`:
 
 - COLUMN_NAME_FACTOIDS_EXTRACTED_model_postfix
@@ -210,7 +243,6 @@ python ./costs/cost_estimation.py -p <your-model-postfix>
 ```
 
 This test estimates the token cost for extracting factoids from text and extracting quintuples (from factoids and from raw text), using payment API calls (GPT-4o, Claude, Mistral, ...)
-
 
 ## Test results
 

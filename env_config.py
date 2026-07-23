@@ -27,6 +27,7 @@ provider_ollama_max_context_window =        int(os.getenv("PROVIDER_OLLAMA_MAX_C
 num_rows_to_process =                       abs(int(os.getenv("NUM_ROWS_TO_PROCESS", 0)))  # 0 means process all rows
 doc_parser_input_excel_path =               os.getenv("DOC_PARSER_INPUT_EXCEL_PATH",                "./data/dataset.xlsx")
 doc_parser_output_excel_path =              os.getenv("DOC_PARSER_OUTPUT_EXCEL_PATH",               "./data/dataset_with_factoids.xlsx")
+enable_parallel_quintuples_extraction =     bool(os.getenv("ENABLE_PARALLEL_QUINTUPLES_EXTRACTION", "false").lower() == "true")
 doc_parser_enable_parallel_processing =     bool(os.getenv("DOC_PARSER_ENABLE_PARALLEL_PROCESSING", "false").lower() == "true")
 doc_parser_batch_size =                     int(os.getenv("DOC_PARSER_BATCH_SIZE",                  2))
 column_name_date =                          os.getenv("COLUMN_NAME_DATE",                           "date")
@@ -52,6 +53,7 @@ translator_few_shot_seed =                  int(os.getenv("TRANSLATOR_FEW_SHOT_S
 
 # Evaluation configuration
 eval_input_dataset_path =                   os.getenv("EVAL_INPUT_DATASET_PATH",            "./datasets/atom/my_test_datasets/dataset.pkl")
+eval_input_knowledge_graph_path =           os.getenv("EVAL_INPUT_KNOWLEDGE_GRAPH_PATH",    "./datasets/atom/my_test_datasets/eval_kg.pkl")
 eval_output_dataset_path =                  os.getenv("EVAL_OUTPUT_DATASET_PATH",           "./datasets/atom/my_test_datasets/dataset_with_factoids.pkl")
 eval_output_results_path =                  os.getenv("EVAL_OUTPUT_RESULTS_PATH",           "./datasets/atom/my_test_datasets/evaluation_results")
 eval_cache_path =                           os.getenv("EVAL_CACHE_PATH",                    "./datasets/atom/my_test_datasets/cache")

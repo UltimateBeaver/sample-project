@@ -6,38 +6,199 @@ class Prompt(Enum):
     FEW SHOT EXAMPLES \n
 
     * Michel served as CFO at Acme Corp from 2019 to 2021. He was hired by Beta Inc in 2021, but left that role in 2023.
-    -> (Michel, is_CFO_of, Acme Corp, ["01-01-2019"], ["01-01-2021"]), (Michel, works_at, Beta Inc, ["01-01-2021"], ["01-01-2023"])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "Person", "name": "Michel"},
+          "endNode": {"label": "Organization", "name": "Acme Corp"},
+          "name": "is_CFO_of",
+          "t_start": ["2019-01-01"],
+          "t_end": ["2021-01-01"]
+        },
+        {
+          "startNode": {"label": "Person", "name": "Michel"},
+          "endNode": {"label": "Organization", "name": "Beta Inc"},
+          "name": "works_at",
+          "t_start": ["2021-01-01"],
+          "t_end": ["2023-01-01"]
+        }
+      ]
+    }
+    ```
 
     * Subsequent experiments confirmed the role of microRNAs in modulating cell growth.
-    -> (Experiments, confirm_role_of, microRNAs, [], []), (microRNAs, modulate, Cell Growth, [], [])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "Event", "name": "Experiments"},
+          "endNode": {"label": "Methodology", "name": "microRNAs"},
+          "name": "confirm_role_of",
+          "t_start": [],
+          "t_end": []
+        },
+        {
+          "startNode": {"label": "Methodology", "name": "microRNAs"},
+          "endNode": {"label": "Event", "name": "Cell Growth"},
+          "name": "modulate",
+          "t_start": [],
+          "t_end": []
+        }
+      ]
+    }
+    ```
 
     * Researchers used high-resolution imaging in a study on neural plasticity.
-    -> (Researchers, use, High-Resolution Imaging, [], []), (High-Resolution Imaging, is_used_in, Study on Neural Plasticity, [], [])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "Group", "name": "Researchers"},
+          "endNode": {"label": "Methodology", "name": "High-Resolution Imaging"},
+          "name": "use",
+          "t_start": [],
+          "t_end": []
+        },
+        {
+          "startNode": {"label": "Methodology", "name": "High-Resolution Imaging"},
+          "endNode": {"label": "Research", "name": "Study on Neural Plasticity"},
+          "name": "is_used_in",
+          "t_start": [],
+          "t_end": []
+        }
+      ]
+    }
+    ```
 
     * Sarah was a board member of GreenFuture until 2019.
-    -> (Sarah, is_board_member_of, GreenFuture, [], ["01-01-2019"])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "Person", "name": "Sarah"},
+          "endNode": {"label": "Organization", "name": "GreenFuture"},
+          "name": "is_board_member_of",
+          "t_start": [],
+          "t_end": ["2019-01-01"]
+        }
+      ]
+    }
+    ```
 
     * Dr. Lee was the head of the Oncology Department until 2022.
-    -> (Dr. Lee, is_head_of, Oncology Department, [], ["01-01-2022"])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "Person", "name": "Dr. Lee"},
+          "endNode": {"label": "Organization", "name": "Oncology Department"},
+          "name": "is_head_of",
+          "t_start": [],
+          "t_end": ["2022-01-01"]
+        }
+      ]
+    }
+    ```
 
     * Activity-dependent modulation of receptor trafficking is crucial for maintaining synaptic efficacy.
-    -> (Activity-Dependent Modulation, involves, Receptor Trafficking, [], []), (Receptor Trafficking, maintains, Synaptic Efficacy, [], [])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "BiologicalProcess", "name": "Activity-Dependent Modulation"},
+          "endNode": {"label": "BiologicalProcess", "name": "Receptor Trafficking"},
+          "name": "involves",
+          "t_start": [],
+          "t_end": []
+        },
+        {
+          "startNode": {"label": "BiologicalProcess", "name": "Receptor Trafficking"},
+          "endNode": {"label": "BiologicalProcess", "name": "Synaptic Efficacy"},
+          "name": "maintains",
+          "t_start": [],
+          "t_end": []
+        }
+      ]
+    }
+    ```
 
     * (observation_date = 2024-06-15) John Doe is no longer the CEO of GreenIT a few months ago.
-    -> (John Doe, is_CEO_of, GreenIT, [], ["2024-03-15"])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "Person", "name": "John Doe"},
+          "endNode": {"label": "Organization", "name": "GreenIT"},
+          "name": "is_CEO_of",
+          "t_start": [],
+          "t_end": ["2024-03-15"]
+        }
+      ]
+    }
+    ```
     # "a few months ago" ≈ 3 months → 2024-06-15 minus 3 months = 2024-03-15
 
     * John Doe's marriage is happening on 26-02-2026.
-    -> (John Doe, has_status, Married, ["2026-02-26"], [])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "Person", "name": "John Doe"},
+          "endNode": {"label": "Status", "name": "Married"},
+          "name": "has_status",
+          "t_start": ["2026-02-26"],
+          "t_end": []
+        }
+      ]
+    }
+    ```
 
     * (observation_date = 2024-03-20) The AI Summit conference started yesterday and will end tomorrow.
-    -> (AI Summit, has_status, Started, ["2024-03-19"], ["2024-03-21"])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "Event", "name": "AI Summit"},
+          "endNode": {"label": "Status", "name": "Started"},
+          "name": "has_status",
+          "t_start": ["2024-03-19"],
+          "t_end": ["2024-03-21"]
+        }
+      ]
+    }
+    ```
 
     * The independence day of Morocco is celebrated on January 1st each year since 1956.
-    -> (Morocco, celebrates, Independence Day, ["1956-01-01"], [])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "Location", "name": "Morocco"},
+          "endNode": {"label": "Event", "name": "Independence Day"},
+          "name": "celebrates",
+          "t_start": ["1956-01-01"],
+          "t_end": []
+        }
+      ]
+    }
+    ```
 
     * (observation_date = 2024-08-10) The product launch event is scheduled for next month.
     -> (Product Launch, has_status, Scheduled, ["2024-09-01"], [])
+    ```json
+    {
+      "relationships": [
+        {
+          "startNode": {"label": "Event", "name": "Product Launch"},
+          "endNode": {"label": "Status", "name": "Scheduled"},
+          "name": "has_status",
+          "t_start": ["2024-09-01"],
+          "t_end": []
+        }
+      ]
+    }
+    ```
     # "next month" = first day of September 2024
     
     """
@@ -53,6 +214,7 @@ class Prompt(Enum):
         sacrificing accuracy. Do not add any information that is not explicitly mentioned in the text
         Remember, the knowledge graph should be coherent and easily understandable, 
         so maintaining consistency in entity references is crucial.
+        If a factoid has no explicit dates or temporal references, set t_start=[] and t_end=[]. DO NOT drop atemporal facts.
         """
 
 '''

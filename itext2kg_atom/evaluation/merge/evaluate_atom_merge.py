@@ -7,6 +7,7 @@ Precision: Measures how many entities ATOM should merge but didn't (false negati
 Recall: Measures how well ATOM is merging entities compared to ground truth
 """
 
+import ast
 import os
 from pathlib import Path
 import pickle
@@ -18,7 +19,8 @@ from typing import List, Dict, Any, Tuple
 import asyncio
 from models.models import get_default_model, get_default_embedding_model
 from env_config import (
-    eval_input_dataset_path, eval_cache_path
+    eval_input_dataset_path, eval_input_knowledge_graph_path, eval_cache_path, num_rows_to_process,
+    column_name_quintuples_ground_truth
 )
 
 # Add the project root to Python path (same pattern as other scripts)
@@ -31,7 +33,7 @@ sys.path.append(str(project_root))
 # ============================================================================
 
 # Path to the ATOM knowledge graph pickle file
-ATOM_KG_PATH = "/Users/yassirlairgi/Developer/Projects/ATOM_Article/batch_cache_atom/final_kg.pkl"
+ATOM_KG_PATH = project_root / eval_input_knowledge_graph_path
 
 # Path to the df_nyt pickle file (contains ground truth data)
 DF_NYT_PATH = project_root / eval_input_dataset_path
@@ -40,12 +42,53 @@ DF_NYT_PATH = project_root / eval_input_dataset_path
 THRESHOLD = 0.8
 
 # Cache file for ground truth entity embeddings
-ENTITY_EMBEDDINGS_CACHE = project_root / eval_cache_path / "atom" / "entity_embeddings_ground_truth_atom.pkl"
+ENTITY_EMBEDDINGS_CACHE = f"{project_root}/{eval_cache_path}/cache_atom/entity_embeddings_ground_truth_atom.pkl"
+Path(ENTITY_EMBEDDINGS_CACHE).parent.mkdir(parents=True, exist_ok=True)
 
 
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
+def normalize_quintuples_list(value):
+    """
+    Normalizes a pandas cell value into a list of quintuples (5-tuples).
+    Handles raw lists/tuples, stringified representations, and missing data.
+    """
+    #parsed = value
+
+    # Convert string representation to Python objects
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value in ('[]', '()'):
+            return []
+        try:
+            value = ast.literal_eval(value)
+        except Exception:
+            return []
+    
+    # If it's a NumPy array, convert it to a standard Python list
+    if type(value).__name__ == 'ndarray':
+        value = value.tolist()
+
+    if isinstance(value, (list, tuple)):
+        if len(value) == 0:
+            return []
+
+        # Edge Case: Single quintuple passed directly
+        if len(value) == 5 and isinstance(value[0], str):
+            return [tuple(value)]
+
+        # Standard Case: Extract valid 5-tuples
+        normalized = []
+        for item in value:
+            if isinstance(item, (list, tuple)) and len(item) == 5:
+                normalized.append(tuple(item))
+        return normalized
+
+    if pd.isna(value):
+        return []
+    # Catch-all fallback for unexpected types
+    return []
 
 def load_atom_kg(path: str) -> Any:
     """Load ATOM knowledge graph from pickle file."""
@@ -60,6 +103,11 @@ def load_df_nyt(path: str) -> pd.DataFrame:
     """Load NYT dataframe from pickle file."""
     print(f"📂 Loading NYT dataframe from: {path}")
     df = pd.read_pickle(path)
+    if num_rows_to_process > 0:
+        df = df.head(num_rows_to_process)
+    
+    # Normalize quintuples list of eah row
+    df[column_name_quintuples_ground_truth] = df[column_name_quintuples_ground_truth].apply(normalize_quintuples_list)
     print(f"   ✅ Loaded dataframe with {len(df)} rows")
     return df
 
@@ -176,7 +224,7 @@ def find_similar_nodes_atom(atom_kg: Any, similarity_threshold: float = 0.9) -> 
     return similar_pairs
 
 def calculate_number_of_entities(df_nyt):
-    all_entities = [relation[0] for relation in df_nyt["quintuples_g_truth"].cumsum().iloc[-1]] + [relation[2] for relation in df_nyt["quintuples_g_truth"].cumsum().iloc[-1]]
+    all_entities = [relation[0] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]] + [relation[2] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]]
     #non_duplicated_entities = list(set(all_entities))
     return len(all_entities)
 
@@ -185,7 +233,7 @@ def calculate_number_of_entities_(df_nyt: pd.DataFrame) -> int:
     all_entities = []
     
     # Collect all entities from quintuples_g_truth
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -233,7 +281,7 @@ async def number_ground_truth_merged_entities(
     
     # Step 1: Get all entities (with duplicates)
     all_entities = []
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -489,7 +537,7 @@ def calculate_number_of_relations_atom(atom_kg: Any) -> int:
     return len(unique_relation_names)
 
 def calculate_number_of_relations(df_nyt):
-    all_relations = [relation[1] for relation in df_nyt["quintuples_g_truth"].cumsum().iloc[-1]]
+    all_relations = [relation[1] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]]
     return len(all_relations)
 
 
@@ -498,7 +546,7 @@ def calculate_number_of_relations_(df_nyt: pd.DataFrame) -> int:
     all_relations = []
     
     # Collect all relations from quintuples_g_truth
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -582,7 +630,7 @@ async def number_ground_truth_merged_relations(
     
     # Step 1: Get all relations (with duplicates)
     all_relations = []
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -765,7 +813,6 @@ async def main():
     atom_kg = load_atom_kg(ATOM_KG_PATH)
     df_nyt = load_df_nyt(DF_NYT_PATH)
     
-    print("\n🔧 Using pre-initialized embeddings model: text-embedding-3-large")
     print(f"💾 Entity embeddings cache: {ENTITY_EMBEDDINGS_CACHE}")
     if os.path.exists(ENTITY_EMBEDDINGS_CACHE):
         print("   ✅ Cache file exists - will use cached embeddings if they match")

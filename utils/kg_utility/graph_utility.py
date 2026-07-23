@@ -1,5 +1,7 @@
 import asyncio
 import json
+from pathlib import Path
+import pickle
 import networkx as nx
 import numpy as np
 import logging
@@ -33,9 +35,9 @@ class GraphEncoder(json.JSONEncoder):
         return super().default(obj)
 
 class GraphUtility():
-    def __init__(self):
-        self.export_file_path = "./data/knowledge_graph/knowledge_graph"
-        self.import_file_path = self.export_file_path
+    def __init__(self, export_file_path, import_file_path):
+        self.export_file_path = export_file_path
+        self.import_file_path = import_file_path
 
         try:
             self.neo4j = Neo4jStorage(uri=neo4j_uri, username=neo4j_username, password=neo4j_password)
@@ -60,6 +62,7 @@ class GraphUtility():
         return kg
 
     async def export_graph(self):
+        Path(self.export_file_path).parent.mkdir(parents=True, exist_ok=True)
         # Parse graph into your Pydantic model
         logger.info("📥 Extracting knowledge graph from Neo4j...")
         kg = KnowledgeGraph.from_neo4j(self.neo4j)
@@ -101,6 +104,13 @@ class GraphUtility():
             
         nx.write_graphml(G, f"{self.export_file_path}.graphml")
         logger.info(f"✅ Exported to GraphML: {self.export_file_path}.graphml")
+
+
+        # ---- FORMAT 3: PICKLE (BINARY) ----
+        logger.info("💾 Serializing knowledge graph to Pickle...")
+        with open(f"{self.export_file_path}.pkl", "wb") as f:
+            pickle.dump(kg, f)
+        logger.info(f"✅ Exported to Pickle: {self.export_file_path}.pkl")
 
     def read_graph_from_file(self) -> KnowledgeGraph:
         logger.info("📤 Loading JSON file...")
@@ -164,7 +174,7 @@ async def main():
         logger.error("Configuration validation failed. Exiting.")
         return
 
-    kg_utility = GraphUtility()
+    kg_utility = GraphUtility("./data/knowledge_graph/knowledge_graph", "./data/knowledge_graph/knowledge_graph")
     choice = -1
 
     print("-"*90)

@@ -95,6 +95,7 @@ async def main():
     logger.info(f"🌐 Document processing configuration:")
     logger.info(f"   Translation enabled: {enable_translation}")
 
+    # Extract atomic pieces of information (Atomic facts, aka Factoids) from raw text paragraphs
     df_atomic_facts = await parse_news_paragraphs_into_atomic_facts()
     df_atomic_facts.to_pickle(doc_parser_output_excel_path.replace(".xlsx", ".pkl"))
 
@@ -103,11 +104,6 @@ async def main():
     #news_covid = pd.read_pickle("./data/small_pickle.pkl")
 
     news_covid = pd.read_pickle(doc_parser_output_excel_path.replace(".xlsx", ".pkl"))
-
-    """
-    Todo: When reading small_pickle.pkl everything works fine.
-    When reading the df_atomic_facts.to_pickle() I get tons of warnings for failed JSON parsing.
-    """
 
     news_covid_dict = news_covid
     # Convert the dataframe into the required dictionary format

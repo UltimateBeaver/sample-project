@@ -36,7 +36,7 @@ from itext2kg.atom.models import RelationshipsExtractor, Prompt
 from models.models import get_default_model, get_default_embedding_model
 from env_config import (
     column_name_quintuples_extracted, column_name_date, column_name_factoids_ground_truth, column_name_factoids_extracted, column_name_quintuples_prompt_tokenc, 
-    eval_input_dataset_path, eval_output_dataset_path, eval_model_postfixes_list, num_rows_to_process, num_rows_to_process
+    eval_input_dataset_path, eval_output_dataset_path, eval_model_postfixes_list, num_rows_to_process, num_rows_to_process, enable_parallel_quintuples_extraction
 )
 
 # Configure logging
@@ -116,9 +116,21 @@ async def extract_quintuples(contexts: list[list[str]], timestamps: list[str]) -
     
     for i, (context, obs_timestamp) in enumerate(zip(contexts, timestamps)):
         logger.info(f"🔍 Processing context {i+1}/{len(contexts)} with timestamp {obs_timestamp}")
+
+        # if enable_parallel_quintuples_extraction:
+        #     # Generate as many prompt as the number of atomic facts
+        #     formatted_facts = context
+        # else:
+        #     # Group factoids related to the same observation date and send them in one single prompt
+        #     if isinstance(context, list):
+        #         formatted_facts = "\n".join([f"{i+1}. {fact}" for i, fact in enumerate(context)])
+        #         formatted_facts = [formatted_facts]
+        #     else:
+        #         formatted_facts = [context]
         
         quintuples_all_data = await lg_kg_construction.extract_information_as_json_for_context(
             output_data_structure=RelationshipsExtractor,
+            #contexts=formatted_facts,
             contexts=context,
             system_query=Prompt.temporal_system_query(obs_timestamp=obs_timestamp) + Prompt.EXAMPLES.value,
         )

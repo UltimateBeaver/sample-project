@@ -53,7 +53,7 @@ from difflib import SequenceMatcher
 
 from itext2kg_atom.itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg_atom.itext2kg.atom.models import AtomicFact
-from parser_prompt import ParserPrompt
+from .parser_prompt import ParserPrompt
 from translation.translator import TranslationService
 from env_config import (
     num_rows_to_process, doc_parser_input_excel_path, doc_parser_output_excel_path, doc_parser_enable_parallel_processing, doc_parser_batch_size,

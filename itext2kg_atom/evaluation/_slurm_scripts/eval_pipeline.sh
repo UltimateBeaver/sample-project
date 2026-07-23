@@ -90,8 +90,14 @@ cd $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/evaluation
 # Tell Python where the root directory of your project is
 export PYTHONPATH=$SCRATCH_FLASH/thesis-project/sample-project:$PYTHONPATH
 
+# Add main project .env for accessing environment variables
+source $SCRATCH_FLASH/thesis-project/sample-project/.env
 # Add the slurm config file to this scope (to get $MODEL_POSTFIX value)
 source ./_slurm_scripts/_slurm_config.env
+
+echo "Removing previously tests results for starting fresh: $EVAL_OUTPUT_RESULTS_PATH and $EVAL_OUTPUT_DATASET_PATH ..."
+rm -r $EVAL_OUTPUT_RESULTS_PATH
+rm -r $EVAL_OUTPUT_DATASET_PATH
 
 echo "--- Running Exhaustivity Tests ---"
 python ./exhaustivity/factoids_extraction_nyt.py -p $MODEL_POSTFIX

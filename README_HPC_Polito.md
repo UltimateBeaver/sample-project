@@ -96,9 +96,11 @@ In this guide there will be several steps in which you are required to copy-past
     # Paths for document parsing
     DOC_PARSER_INPUT_EXCEL_PATH=./data/Annotazioni_1.xlsx
     DOC_PARSER_OUTPUT_EXCEL_PATH=./data/Annotazioni_1_with_factoids.xlsx
-    DOC_PARSER_ENABLE_PARALLEL_PROCESSING=false
     # Batch size for document parsing (number of paragraphs to process in parallel)
     DOC_PARSER_BATCH_SIZE=2
+    # Set the following two variables to false if you are testing the ATOM pipeline on your local machine (expecially if it can handle one llm server slot only)
+    ENABLE_PARALLEL_QUINTUPLES_EXTRACTION=true
+    DOC_PARSER_ENABLE_PARALLEL_PROCESSING=false
     # Column names in the input Excel file
     COLUMN_NAME_DATE=DATA
     COLUMN_NAME_PARAGRAPH=ARTICOLO

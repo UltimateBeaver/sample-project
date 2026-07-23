@@ -10,6 +10,8 @@ from dateutil import parser
 import asyncio
 from itext2kg.logging_config import get_logger
 
+from env_config import enable_parallel_quintuples_extraction
+
 logger = get_logger(__name__)
 
 class Atom:
@@ -26,16 +28,40 @@ class Atom:
         """
         self.matcher = GraphMatcher()
         self.llm_output_parser = LangchainOutputParser(llm_model=llm_model, embeddings_model=embeddings_model)
+
+        # Initialize a semaphore with 1 permit if the flag is True
+        self.quintuples_extraction_semaphore = asyncio.Semaphore(1) if not enable_parallel_quintuples_extraction else None
     
     async def extract_quintuples(self, atomic_facts: List[str], observation_timestamp: str) -> List[RelationshipsExtractor]:
         """
         Extracts relationships from atomic facts using the language model.
         """
-        return await self.llm_output_parser.extract_information_as_json_for_context(
-            output_data_structure=RelationshipsExtractor,
-            contexts=atomic_facts,
-            system_query=Prompt.temporal_system_query(observation_timestamp) + Prompt.EXAMPLES.value
-        )
+        # Combine isolated atomic facts into a single structured text block
+        if self.quintuples_extraction_semaphore: 
+            # Force sequential quintuples extraction.
+            # One prompt contains multiple factoids for the same observation date, to reduce server's api call overhead
+            if isinstance(atomic_facts, list):
+                formatted_facts = "\n".join([f"{i+1}. {fact}" for i, fact in enumerate(atomic_facts)])
+                contexts = [formatted_facts]
+            else:
+                contexts = [atomic_facts]
+            # Note: the semaphore is not needed, as the main problem relies on the multiple concurrent LLM calls for each fact, 
+            # at least when executing the pipeline on the local machine
+            async with self.quintuples_extraction_semaphore:
+                return await self.llm_output_parser.extract_information_as_json_for_context(
+                    output_data_structure=RelationshipsExtractor,
+                    contexts=atomic_facts,
+                    #contexts=contexts,
+                    system_query=Prompt.temporal_system_query(observation_timestamp) + Prompt.EXAMPLES.value
+                )
+        else:
+            # Allows parallel Langchain calls for extracting quintuples.
+            # One prompt for each factoid is sent towards the LLM backend
+            return await self.llm_output_parser.extract_information_as_json_for_context(
+                output_data_structure=RelationshipsExtractor,
+                contexts=atomic_facts,
+                system_query=Prompt.temporal_system_query(observation_timestamp) + Prompt.EXAMPLES.value
+            )
 
     def merge_two_kgs(self, kg1, kg2, rel_threshold:float=0.8, ent_threshold:float=0.8):
         """
@@ -123,7 +149,7 @@ class Atom:
         for relationship in relationships:
             if relationship.t_start is None:
                 relationship.t_start = []
-            elif relationship.t_end is None:
+            if relationship.t_end is None:
                 relationship.t_end = []
             
             start_entity = temp_kg.get_entity(Entity(**relationship.startNode.model_dump()))
@@ -187,11 +213,12 @@ class Atom:
                           entity_label_weight:float=0.2,
                           max_workers:int=8,
                         ) -> KnowledgeGraph:
-        system_query = Prompt.temporal_system_query(obs_timestamp=obs_timestamp)
-        examples = Prompt.EXAMPLES.value
+        #system_query = Prompt.temporal_system_query(obs_timestamp=obs_timestamp)
+        #examples = Prompt.EXAMPLES.value
         logger.info("------- Extracting Quintuples---------")
-        relationships = await self.llm_output_parser.extract_information_as_json_for_context(output_data_structure=RelationshipsExtractor, contexts=atomic_facts, system_query=system_query+examples)
-        
+        #relationships = await self.llm_output_parser.extract_information_as_json_for_context(output_data_structure=RelationshipsExtractor, contexts=atomic_facts, system_query=system_query+examples)
+        relationships = await self.extract_quintuples(atomic_facts=atomic_facts, observation_timestamp=obs_timestamp)
+
         logger.info("------- Building Atomic KGs---------")
         
         atomic_kgs = await asyncio.gather(*list(map(

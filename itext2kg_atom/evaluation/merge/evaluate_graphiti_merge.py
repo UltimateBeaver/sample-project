@@ -14,59 +14,115 @@ Output:
     - Analysis of false positives and false negatives in relation merging
 """
 
+import ast
 import os
+from pathlib import Path
 import pickle
+import sys
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain_openai import OpenAIEmbeddings
 from typing import List, Dict, Any, Tuple
 import asyncio
+from models.models import get_default_model, get_default_embedding_model
+from itext2kg_atom.evaluation.merge.evaluate_graphiti_merge_mapper import map_knowledge_graph_to_eval_format
 
+from env_config import (
+    eval_input_dataset_path, eval_input_knowledge_graph_path, eval_cache_path, num_rows_to_process,
+    column_name_quintuples_ground_truth
+)
+
+# Add the project root to Python path (same pattern as other scripts)
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+sys.path.append(str(project_root))
 
 # ============================================================================
 # GLOBAL CONFIGURATION
 # ============================================================================
 
 # Path to the graph_data pickle file (contains nodes and relationships from Graphiti)
-GRAPH_DATA_PATH = "/Users/yassirlairgi/Developer/Projects/ATOM_Article/evaluation/neo4j_graph_data.pkl"
+GRAPH_DATA_PATH = project_root / eval_input_knowledge_graph_path
 
 # Path to the df_nyt pickle file (contains ground truth data)
-DF_NYT_PATH = "/Users/yassirlairgi/Developer/Projects/ATOM_Article/datasets/nyt_news/2020_nyt_COVID_last_version_ready_quintuples_gpt41_from_factoids_run3_run3_graphiti.pkl"
+DF_NYT_PATH = project_root / eval_input_dataset_path
 
 # Similarity threshold for determining duplicates
 THRESHOLD = 0.8
 
+openai_embeddings_model = get_default_embedding_model()
+
 # Cache file for relation embeddings
-RELATION_EMBEDDINGS_CACHE = "./relation_embeddings_graphiti.pkl"
-
-# OpenAI API Key
-OPENAI_API_KEY = "###"
-
-# Initialize OpenAI Embeddings model
-openai_embeddings_model = OpenAIEmbeddings(
-    api_key=OPENAI_API_KEY,
-    model="text-embedding-3-large",
-)
+RELATION_EMBEDDINGS_CACHE = f"{project_root}/{eval_cache_path}/cache_graphiti/relation_embeddings_graphiti.pkl"
+Path(RELATION_EMBEDDINGS_CACHE).parent.mkdir(parents=True, exist_ok=True)
+# Cache for entity embeddings
+ENTITY_EMBEDDINGS_CACHE = f"{project_root}/{eval_cache_path}/cache_graphiti/entity_embeddings_ground_truth_graphiti.pkl"
 
 
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
+def normalize_quintuples_list(value):
+    """
+    Normalizes a pandas cell value into a list of quintuples (5-tuples).
+    Handles raw lists/tuples, stringified representations, and missing data.
+    """
+    #parsed = value
+
+    # Convert string representation to Python objects
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value in ('[]', '()'):
+            return []
+        try:
+            value = ast.literal_eval(value)
+        except Exception:
+            return []
+    
+    # If it's a NumPy array, convert it to a standard Python list
+    if type(value).__name__ == 'ndarray':
+        value = value.tolist()
+
+    if isinstance(value, (list, tuple)):
+        if len(value) == 0:
+            return []
+
+        # Edge Case: Single quintuple passed directly
+        if len(value) == 5 and isinstance(value[0], str):
+            return [tuple(value)]
+
+        # Standard Case: Extract valid 5-tuples
+        normalized = []
+        for item in value:
+            if isinstance(item, (list, tuple)) and len(item) == 5:
+                normalized.append(tuple(item))
+        return normalized
+
+    if pd.isna(value):
+        return []
+    # Catch-all fallback for unexpected types
+    return []
 
 def load_graph_data(path: str) -> Dict[str, Any]:
     """Load graph data from pickle file."""
     print(f"📂 Loading graph data from: {path}")
     with open(path, 'rb') as f:
         data = pickle.load(f)
-    print(f"   ✅ Loaded graph with {len(data.get('nodes', []))} nodes and {len(data.get('relationships', []))} relationships")
-    return data
+
+    graph_data = map_knowledge_graph_to_eval_format(data)
+    print(f"   ✅ Loaded graph with {len(graph_data.get('nodes', []))} nodes and {len(graph_data.get('relationships', []))} relationships")
+    return graph_data
 
 
 def load_df_nyt(path: str) -> pd.DataFrame:
     """Load NYT dataframe from pickle file."""
     print(f"📂 Loading NYT dataframe from: {path}")
     df = pd.read_pickle(path)
+    if num_rows_to_process > 0:
+        df = df.head(num_rows_to_process)
+
+    df[column_name_quintuples_ground_truth] = df[column_name_quintuples_ground_truth].apply(normalize_quintuples_list)
     print(f"   ✅ Loaded dataframe with {len(df)} rows")
     return df
 
@@ -139,7 +195,7 @@ def find_similar_nodes(graph_data: Dict[str, Any], similarity_threshold: float =
     return similar_pairs
 
 def calculate_number_of_entities(df_nyt):
-    all_entities = [relation[0] for relation in df_nyt["quintuples_g_truth"].cumsum().iloc[-1]] + [relation[2] for relation in df_nyt["quintuples_g_truth"].cumsum().iloc[-1]]
+    all_entities = [relation[0] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]] + [relation[2] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]]
     #non_duplicated_entities = list(set(all_entities))
     return len(all_entities)
 
@@ -148,7 +204,7 @@ def calculate_number_of_entities_(df_nyt: pd.DataFrame) -> int:
     all_entities = []
     
     # Collect all entities from quintuples_g_truth
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -227,7 +283,7 @@ async def number_ground_truth_merged_entities_graphiti(df_nyt: pd.DataFrame, thr
     
     # Step 1: Get all entities (with duplicates)
     all_entities = []
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -517,7 +573,7 @@ def calculate_number_of_relations_graphiti(graph_data: Dict[str, Any]) -> int:
     return len(extract_relations_names(graph_data))
 
 def calculate_number_of_relations(df_nyt):
-    all_relations = [relation[1] for relation in df_nyt["quintuples_g_truth"].cumsum().iloc[-1]]
+    all_relations = [relation[1] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]]
     return len(all_relations)
 
 def calculate_number_of_relations_(df_nyt: pd.DataFrame) -> int:
@@ -525,7 +581,7 @@ def calculate_number_of_relations_(df_nyt: pd.DataFrame) -> int:
     all_relations = []
     
     # Collect all relations from quintuples_g_truth
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -613,7 +669,7 @@ async def number_ground_truth_merged_relations_graphiti(
     
     # Step 1: Get all relations (with duplicates)
     all_relations = []
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -808,7 +864,7 @@ async def main():
     
     print("\n🔧 Using pre-initialized embeddings model: text-embedding-3-large")
     print(f"💾 Relation embeddings cache: {RELATION_EMBEDDINGS_CACHE}")
-    entity_cache_path = "./entity_embeddings_ground_truth_graphiti.pkl"
+    entity_cache_path = ENTITY_EMBEDDINGS_CACHE
     print(f"💾 Entity embeddings cache: {entity_cache_path}")
     if os.path.exists(RELATION_EMBEDDINGS_CACHE):
         print("   ✅ Relation cache file exists - will use cached embeddings if they match")

@@ -139,12 +139,12 @@ class EntitiesExtractor(BaseModel):
 class Relationship(BaseModel):
     startNode: Entity = Field(
         description=(
-            "The 'subject' or source entity of this relationship, which must appear in the EntitiesExtractor."
+            "The 'subject' or source entity of this relationship. Must be a distinct entity encoding exactly one concept."
         )
     )
     endNode: Entity = Field(
         description=(
-            "The 'object' or target entity of this relationship, which must also appear in the EntitiesExtractor."
+            "The 'object' or target entity of this relationship. Must be a distinct entity encoding exactly one concept."
         )
     )
     name: str = Field(

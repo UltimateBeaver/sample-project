@@ -14,45 +14,90 @@ Output:
     - Analysis of false positives and false negatives in entity merging
 """
 
+import ast
 import os
+from pathlib import Path
 import pickle
+import sys
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Dict, Any, Tuple
 from langchain_openai import OpenAIEmbeddings
 import asyncio
+from models.models import get_default_model, get_default_embedding_model
+from env_config import (
+    eval_input_dataset_path, eval_input_knowledge_graph_path, eval_cache_path, num_rows_to_process,
+    column_name_quintuples_ground_truth
+)
 
+# Add the project root to Python path (same pattern as other scripts)
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+sys.path.append(str(project_root))
 
 # ============================================================================
 # GLOBAL CONFIGURATION
 # ============================================================================
 
 # Path to the iText2KG knowledge graph pickle file (last batch)
-ITEXT2KG_KG_PATH = "/Users/yassirlairgi/Developer/Projects/ATOM_Article/batch_cache_itext2kg/batch_56_kg.pkl"
+# ITEXT2KG_KG_PATH = "/Users/yassirlairgi/Developer/Projects/ATOM_Article/batch_cache_itext2kg/batch_56_kg.pkl"
+ITEXT2KG_KG_PATH = project_root / eval_input_knowledge_graph_path
 
 # Path to the df_nyt pickle file (contains ground truth data)
-DF_NYT_PATH = "/Users/yassirlairgi/Developer/Projects/ATOM_Article/datasets/nyt_news/2020_nyt_COVID_last_version_ready_quintuples_gpt41_from_factoids_run3_run3_itext2kg.pkl"
+DF_NYT_PATH = project_root / eval_input_dataset_path
 
 # Similarity threshold for determining duplicates
 THRESHOLD = 0.8
 
 # Cache file for ground truth entity embeddings
-ENTITY_EMBEDDINGS_CACHE = "./entity_embeddings_ground_truth_itext2kg.pkl"
-
-# OpenAI API Key
-OPENAI_API_KEY = "###"
-
-# Initialize embeddings model
-embeddings_model = OpenAIEmbeddings(
-    api_key=OPENAI_API_KEY,
-    model="text-embedding-3-large",
-)
+ENTITY_EMBEDDINGS_CACHE = f"{project_root}/{eval_cache_path}/cache_itext2kg/entity_embeddings_ground_truth_itext2kg.pkl"
+Path(ENTITY_EMBEDDINGS_CACHE).parent.mkdir(parents=True, exist_ok=True)
 
 
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
+def normalize_quintuples_list(value):
+    """
+    Normalizes a pandas cell value into a list of quintuples (5-tuples).
+    Handles raw lists/tuples, stringified representations, and missing data.
+    """
+    #parsed = value
+
+    # Convert string representation to Python objects
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value in ('[]', '()'):
+            return []
+        try:
+            value = ast.literal_eval(value)
+        except Exception:
+            return []
+    
+    # If it's a NumPy array, convert it to a standard Python list
+    if type(value).__name__ == 'ndarray':
+        value = value.tolist()
+
+    if isinstance(value, (list, tuple)):
+        if len(value) == 0:
+            return []
+
+        # Edge Case: Single quintuple passed directly
+        if len(value) == 5 and isinstance(value[0], str):
+            return [tuple(value)]
+
+        # Standard Case: Extract valid 5-tuples
+        normalized = []
+        for item in value:
+            if isinstance(item, (list, tuple)) and len(item) == 5:
+                normalized.append(tuple(item))
+        return normalized
+
+    if pd.isna(value):
+        return []
+    # Catch-all fallback for unexpected types
+    return []
 
 def load_itext2kg_kg(path: str) -> Any:
     """Load iText2KG knowledge graph from pickle file."""
@@ -67,6 +112,11 @@ def load_df_nyt(path: str) -> pd.DataFrame:
     """Load NYT dataframe from pickle file."""
     print(f"📂 Loading NYT dataframe from: {path}")
     df = pd.read_pickle(path)
+    if num_rows_to_process > 0:
+        df = df.head(num_rows_to_process)
+    
+    # Normalize quintuples list of eah row
+    df[column_name_quintuples_ground_truth] = df[column_name_quintuples_ground_truth].apply(normalize_quintuples_list)
     print(f"   ✅ Loaded dataframe with {len(df)} rows")
     return df
 
@@ -183,7 +233,7 @@ def find_similar_nodes_itext2kg(itext2kg_kg: Any, similarity_threshold: float = 
     return similar_pairs
 
 def calculate_number_of_entities(df_nyt):
-    all_entities = [relation[0] for relation in df_nyt["quintuples_g_truth"].cumsum().iloc[-1]] + [relation[2] for relation in df_nyt["quintuples_g_truth"].cumsum().iloc[-1]]
+    all_entities = [relation[0] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]] + [relation[2] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]]
     #non_duplicated_entities = list(set([entity.lower() for entity in all_entities if entity]))
     return len(all_entities)
 
@@ -192,7 +242,7 @@ def calculate_number_of_entities_(df_nyt: pd.DataFrame) -> int:
     all_entities = []
     
     # Collect all entities from quintuples_g_truth
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -278,7 +328,7 @@ async def number_ground_truth_merged_entities_itext2kg(
     
     # Step 1: Get all entities (with duplicates)
     all_entities = []
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -496,7 +546,7 @@ def calculate_number_of_relations_itext2kg(itext2kg_kg: Any) -> int:
     return len(unique_relation_names)
 
 def calculate_number_of_relations(df_nyt):
-    all_relations = [relation[1] for relation in df_nyt["quintuples_g_truth"].cumsum().iloc[-1]]
+    all_relations = [relation[1] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]]
     return len(all_relations)
 
 
@@ -505,7 +555,7 @@ def calculate_number_of_relations_(df_nyt: pd.DataFrame) -> int:
     all_relations = []
     
     # Collect all relations from quintuples_g_truth
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -589,7 +639,7 @@ async def number_ground_truth_merged_relations_itext2kg(
     
     # Step 1: Get all relations (with duplicates)
     all_relations = []
-    for quintuples in df_nyt["quintuples_g_truth"]:
+    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -783,6 +833,8 @@ async def main():
     print("\n" + "=" * 80)
     er_precision, similar_entities = calculate_ER_precision(itext2kg_kg, df_nyt, threshold=THRESHOLD)
     
+    embeddings_model = get_default_embedding_model()
+
     # Calculate Entity Resolution (ER) Recall
     print("\n" + "=" * 80)
     er_recall, ground_truth_merged = await calculate_ER_recall_itext2kg(
