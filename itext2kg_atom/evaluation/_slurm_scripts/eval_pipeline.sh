@@ -29,6 +29,10 @@ fi
 # find . -maxdepth 1 -type f ! -name "*$(squeue -u $(whoami) -h -o '%A')*" -exec mv -t ./old {} +
 # # mv *.log ./old
 
+# Ensure target scratch directories exist BEFORE running rsync
+echo "Creating target scratch directory structure at $SCRATCH_FLASH..."
+mkdir -p "$SCRATCH_FLASH/thesis-project/sample-project"
+
 # Copy the whole project in $SCRATCH_FLASH filesystem
 # echo "Copying required files from $HOME to $SCRATCH_FLASH..."
 # mkdir -p $SCRATCH_FLASH/thesis-project
@@ -42,11 +46,9 @@ rsync -av \
   --exclude='neo4j/logs' \
   $HOME/thesis-project/sample-project/ \
   $SCRATCH_FLASH/thesis-project/sample-project/
-$HOME/thesis-project/sample-project/ \
-$SCRATCH_FLASH/thesis-project/sample-project/
 
 # Move into the directory where your project files, scripts, and .env exist
-cd $SCRATCH_FLASH/thesis-project/sample-project
+cd $SCRATCH_FLASH/thesis-project/sample-project || { echo "Failed to cd to scratch directory"; exit 1; }
 
 # Activate your local Python Virtual Environment
 source venv/bin/activate
