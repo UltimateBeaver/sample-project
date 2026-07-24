@@ -62,6 +62,7 @@ class iRelationsExtractor:
                         - Do not change the name or label of the provided entities list.
                         - Do not add any entity outside the provided list.
                         - Avoid reflexive relations.
+                        - If you do not find any valid relationships, you MUST output exactly {"relationships": []} and stop generating.
                         '''
                         
         if isolated_entities_without_relations:
@@ -94,9 +95,9 @@ class iRelationsExtractor:
             tries += 1
     
         if not relationships or not hasattr(relationships, 'relationships'):
-            raise ValueError("Failed to extract relationships after multiple attempts.")
-            # logger.error("⚠️  Could not extract relationships for context after max attempts. Returning empty entity list to continue pipeline.")
-            # return []
+            # raise ValueError("Failed to extract relationships after multiple attempts.")
+            logger.error("⚠️  Could not extract relationships for context after max attempts. Returning empty entity list to continue pipeline.")
+            return []
         
         logger.debug("Extracted relationships: %s", relationships)
         kg_llm_output = KnowledgeGraph(relationships=[], entities = entities)

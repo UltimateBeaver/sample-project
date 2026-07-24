@@ -49,6 +49,8 @@ class iEntitiesExtractor():
         IE_query  = '''
         # DIRECTIVES : 
         - Act like an experienced knowledge graph builder.
+        - Extract distinct, relevant entities from the context.
+        - CRITICAL: If you do not find any relevant entities, you MUST output exactly {"entities": []} and stop generating immediately. Do not add any conversational text.
         '''
  
         while tries < max_tries:

@@ -529,6 +529,9 @@ async def run_itext2kg_batch_processing():
     # Initialize iText2KG instance
     llm_model = get_default_model()
     llm_model.max_tokens = 2048 # overwrite default config (32768) to prevent long waiting times during retries.
+    llm_model.temperature = 0.1  # Introduces slight entropy to break deterministic loops
+    #llm_model.model_kwargs = {"stop": ["```", "}\n}", "]\n}"]}  # Hard circuit breakers
+
     itext2kg_instance = iText2KG(llm_model=llm_model, embeddings_model=get_default_embedding_model())
     
     logger.info("Starting iText2KG batch processing...")
