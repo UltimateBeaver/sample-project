@@ -84,20 +84,23 @@ sleep 30
 # =========================================================================
 # 3. Run Core Python Evaluation test
 # =========================================================================
+# Add main project .env for accessing environment variables
+source $SCRATCH_FLASH/thesis-project/sample-project/.env
+
+# Move to the itext2kg_atom root directory
+cd $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom
+echo "Removing previously tests results for starting fresh: $EVAL_OUTPUT_RESULTS_PATH and $EVAL_OUTPUT_DATASET_PATH ..."
+rm -r -f $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/$EVAL_OUTPUT_RESULTS_PATH
+rm -r -f $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/$EVAL_OUTPUT_DATASET_PATH
+
 # Move into the evaluation tests directory
-cd $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/evaluation
+cd evaluation
 
 # Tell Python where the root directory of your project is
 export PYTHONPATH=$SCRATCH_FLASH/thesis-project/sample-project:$PYTHONPATH
 
-# Add main project .env for accessing environment variables
-source $SCRATCH_FLASH/thesis-project/sample-project/.env
 # Add the slurm config file to this scope (to get $MODEL_POSTFIX value)
 source ./_slurm_scripts/_slurm_config.env
-
-echo "Removing previously tests results for starting fresh: $EVAL_OUTPUT_RESULTS_PATH and $EVAL_OUTPUT_DATASET_PATH ..."
-rm -r $EVAL_OUTPUT_RESULTS_PATH
-rm -r $EVAL_OUTPUT_DATASET_PATH
 
 echo "--- Running Exhaustivity Tests ---"
 python ./exhaustivity/factoids_extraction_nyt.py -p $MODEL_POSTFIX

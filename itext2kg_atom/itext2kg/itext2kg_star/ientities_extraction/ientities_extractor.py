@@ -23,7 +23,7 @@ class iEntitiesExtractor():
                                                        sleep_time=sleep_time) 
     
     async def extract_entities(self, context: str, 
-                         max_tries:int=5,
+                         max_tries:int=2,
                          entity_name_weight:float=0.6,
                          entity_label_weight:float=0.4) -> List[Entity]:
         """
@@ -70,7 +70,9 @@ class iEntitiesExtractor():
             tries += 1
     
         if not entities or not hasattr(entities, 'entities'):
-            raise ValueError("Failed to extract entities after multiple attempts.")
+            #raise ValueError("Failed to extract entities after multiple attempts.")
+            logger.error("⚠️  Could not extract entities for context after max attempts. Returning empty entity list to continue pipeline.")
+            return []
 
         logger.debug("Extracted entities: %s", entities)
         entities = [Entity(label=entity.label, name=entity.name) 

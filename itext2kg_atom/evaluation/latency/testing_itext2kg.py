@@ -527,7 +527,9 @@ async def run_itext2kg_batch_processing():
         return None
     
     # Initialize iText2KG instance
-    itext2kg_instance = iText2KG(llm_model=get_default_model(), embeddings_model=get_default_embedding_model())
+    llm_model = get_default_model()
+    llm_model.max_tokens = 2048 # overwrite default config (32768) to prevent long waiting times during retries.
+    itext2kg_instance = iText2KG(llm_model=llm_model, embeddings_model=get_default_embedding_model())
     
     logger.info("Starting iText2KG batch processing...")
     logger.info(f"Total facts in dataset: {len(all_facts)}")

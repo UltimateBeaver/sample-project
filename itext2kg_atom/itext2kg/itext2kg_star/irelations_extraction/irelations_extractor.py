@@ -30,7 +30,7 @@ class iRelationsExtractor:
                           context: str, 
                           entities: List[Entity], 
                           isolated_entities_without_relations: List[Entity] = None,
-                          max_tries:int=5,
+                          max_tries:int=2,
                           entity_name_weight:float=0.6,
                           entity_label_weight:float=0.4,
                           ) -> List[Relationship]:
@@ -95,6 +95,9 @@ class iRelationsExtractor:
     
         if not relationships or not hasattr(relationships, 'relationships'):
             raise ValueError("Failed to extract relationships after multiple attempts.")
+            # logger.error("⚠️  Could not extract relationships for context after max attempts. Returning empty entity list to continue pipeline.")
+            # return []
+        
         logger.debug("Extracted relationships: %s", relationships)
         kg_llm_output = KnowledgeGraph(relationships=[], entities = entities)
         
@@ -164,7 +167,7 @@ class iRelationsExtractor:
                           context: str, 
                           entities: List[Entity],
                           rel_threshold:float = 0.7,
-                          max_tries:int=5,
+                          max_tries:int=2,
                           max_tries_isolated_entities:int=3,
                           entity_name_weight:float=0.6,
                           entity_label_weight:float=0.4,
