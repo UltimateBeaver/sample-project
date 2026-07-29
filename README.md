@@ -12,7 +12,7 @@ Sample repo for master's degree thesis
 # Requirements
 * Python (3.10 or greater) at https://www.python.org/downloads/
 * Docker at https://www.docker.com/
-* Ollama at https://ollama.com/download (used as a temporarily free model)
+* Ollama at https://ollama.com/download or llama.cpp backend
 * At least 16 GB of GPU VRAM memory (to execute gemma4 model)
 
 # Installation

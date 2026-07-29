@@ -33,8 +33,8 @@ class KnowledgeGraph(BaseModelWithConfig):
         self.remove_duplicates_entities()
         self.entities = list(map(lambda e: e.process(), self.entities))
 
-        labels = [e.label for e in self.entities]
-        names  = [e.name for e in self.entities]
+        labels = [f"entity class: {e.label.replace('_', ' ')}" for e in self.entities]
+        names  = [f"entity name: {e.name}" for e in self.entities]
 
         label_embeddings = await embeddings_function(labels)
         name_embeddings  = await embeddings_function(names)
@@ -46,8 +46,13 @@ class KnowledgeGraph(BaseModelWithConfig):
                                   embeddings_function: Callable[[List[str]], Awaitable[np.ndarray]]) -> None:
         self.relationships = list(map(lambda r: r.process(), self.relationships))
 
-        names = [r.name for r in self.relationships]
-        rel_embeddings = await embeddings_function(names)
+        # Contextualize relation with its subject and object entity names
+        QWEN_INSTRUCT_PREFIX = "Instruct: Retrieve semantically identical knowledge graph relations.\nQuery: "
+        contextualized_rels = [
+            f"{QWEN_INSTRUCT_PREFIX}relation: {r.name.replace('_', ' ')} between {r.startEntity.name} and {r.endEntity.name}" 
+            for r in self.relationships
+        ]
+        rel_embeddings = await embeddings_function(contextualized_rels)
 
         for r, emb in zip(self.relationships, rel_embeddings):
             r.properties.embeddings = emb
