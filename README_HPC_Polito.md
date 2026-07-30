@@ -211,6 +211,9 @@ In this guide there will be several steps in which you are required to copy-past
     3. Start the two servers with the following command:
         ```bash
         srun --nodes=1 --tasks-per-node=1 --cpus-per-task=4 --gres=gpu:1 --time=01:30:00 --partition=gpu_a40 --pty /bin/bash
+        module load miniconda3/3.13.25
+        module load gcc/12.4.0
+        module load nvhpc/25.1
         chmod +x start-llama-servers.sh && ./start-llama-servers.sh
         # stop servers
         pkill llama-server
@@ -218,10 +221,10 @@ In this guide there will be several steps in which you are required to copy-past
         Note: llama.cpp will use ChatOpenAI Langchain API.
         <br>Make sure that the port you are opening the server is the same as the one configured in `OPENAI_API_BASE` of your `.env` file
 
-5. Inspect the SLURM script *submit.sh* and edit the #SBATCH directives to your needs. Add execution permissions with `chmod +x submit.sh`.
+5. Inspect the SLURM script *submit.sh* and edit the #SBATCH directives to your needs.
 
 # Run the application
-* Run `sbatch submit.sh`. Some utilities commands are provided below:
+* Run `chmod +x submit.sh && sbatch submit.sh`. Some utilities commands are provided below:
     | Command    | Description |
     | -------- | ------- |
     | `squeue -u $(whoami)`  | To monitor your active queue status    |
