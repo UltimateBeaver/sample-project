@@ -168,7 +168,7 @@ In this guide there will be several steps in which you are required to copy-past
         source venv/bin/activate
         pip install huggingface_hub
         cd ~/thesis-project
-        mkdir -p models/.cache
+        mkdir -p models/embeddings
         # Configuration example 1
         # LLM: https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF
         # Embedding: https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF
@@ -176,10 +176,9 @@ In this guide there will be several steps in which you are required to copy-past
         # LLM: https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf
         # Embedding: https://huggingface.co/miti99/gte-Qwen2-1.5B-instruct-Q8_0-GGUF
 
-        hf download unsloth/gemma-4-E4B-it-GGUF gemma-4-E4B-it-Q4_K_M.gguf --local-dir ~/thesis-project/models/.cache
-        mv ~/thesis-project/models/.cache/*.gguf ~/thesis-project/models/llm_model.gguf
-        hf download nomic-ai/nomic-embed-text-v2-moe-GGUF nomic-embed-text-v2-moe.Q8_0.gguf --local-dir ~/thesis-project/models/.cache
-        mv ~/thesis-project/models/.cache/*.gguf ~/thesis-project/models/embedding_model.gguf 
+
+        hf download unsloth/gemma-4-E4B-it-GGUF gemma-4-E4B-it-Q4_K_M.gguf --local-dir ~/thesis-project/models
+        hf download nomic-ai/nomic-embed-text-v2-moe-GGUF nomic-embed-text-v2-moe.Q8_0.gguf --local-dir ~/thesis-project/models/embeddings
 
         # Close SLURM session
         squeue -u $(whoami) -h -o "%A" | xargs -I {} scancel {}
