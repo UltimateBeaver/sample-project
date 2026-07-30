@@ -14,6 +14,7 @@
 # 1. Environment & Path Initialization
 # =========================================================================
 module purge
+module load apptainer
 module load miniconda3/3.13.25
 module load gcc/12.4.0
 module load nvhpc/25.1
