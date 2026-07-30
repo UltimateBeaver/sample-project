@@ -70,9 +70,15 @@ Sample repo for master's degree thesis
     LLAMACPP_PATH_EMBEDDINGS_MODEL="path/to/your/embedding_model.gguf"
     # number of parallel sequences to decode (default: 1)
     LLAMACPP_MODEL_NUM_PARALLEL_SLOTS=1
+    # Flags to enable reasoning / thinking (should be off to avoid tampering the json_schema in Langchain)
+    LLAMACPP_MODEL_REASONING="off"
+    LLAMACPP_MODEL_THINKING="false"
     # Represents the total global pool shared across all parallel slots
     LLAMACPP_MODEL_CONTEXT_SIZE=32768
-    LLAMACPP_EMBED_CONTEXT_SIZE=2048
+    LLAMACPP_EMBED_CONTEXT_SIZE=512
+    # pooling type for embeddings {none,mean,cls,last}. Use model default if unspecified. Use "last" for Qwen2-1.5b-instruct
+    LLAMACPP_EMBED_POOLING="last"
+
     ### Langchain Output Parser: Provider-specific configurations
     ### NOTE: the following configs act as a safeguard to prevent exceeding the maximum context window of the LLM provider. If you encounter errors related to context window limits, consider adjusting these values.
     # ProviderType.OPENAI
@@ -153,10 +159,15 @@ Sample repo for master's degree thesis
 
 * If you want to use llama.cpp, you have to download the right docker image (or directly the llama.cpp binaries) that match your OS and GPU. A bare metal setup  is provided below (tested with Windows 11 with AMD Radeon GPU):
     1. Go to the official llama.cpp https://github.com/ggml-org/llama.cpp/releases and look for the newest release. Download the one that matches your hardware (in my case a Windows zip file compiled for ROCm/HIP)
-    2. Using powershell, download your chosen model in GGUF format (e.g., a quantized version of Gemma 4) from Hugging Face through the following command:
-        ```powershell
-        curl -L -o llm_model.gguf "https://lmstudio.ai/models/google/gemma-4-e4b"
-        curl -L -o embedding_model.gguf "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF"
+    2. Download your chosen model in GGUF format (e.g., a quantized version of Gemma 4) from Hugging Face or LM studio repo:
+        ```sh
+            # Configuration example 1
+            LLM: "https://lmstudio.ai/models/google/gemma-4-e4b"
+            Embedding: "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF"
+
+            # Configuration example 2
+            LLM: "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf"
+            Embedding: "https://huggingface.co/miti99/gte-Qwen2-1.5B-instruct-Q8_0-GGUF"
         ```
         **Then add the paths of these models into the two variables `LLAMACPP_PATH_MODEL` and `LLAMACPP_PATH_EMBEDDINGS_MODEL`, inside `.env` file**
     3. Extract the llama.cpp binaries in a folder you like. Add the path to this folder in your environment variables (on Windows add it to PATH, in control panel)

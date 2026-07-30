@@ -63,9 +63,15 @@ In this guide there will be several steps in which you are required to copy-past
     LLAMACPP_SERVER_BIN="$HOME/thesis-project/llama.cpp/build/bin/llama-server"
     # number of parallel sequences to decode (default: 1)
     LLAMACPP_MODEL_NUM_PARALLEL_SLOTS=1
+    # Flags to enable reasoning / thinking (should be off to avoid tampering the json_schema in Langchain)
+    LLAMACPP_MODEL_REASONING="off"
+    LLAMACPP_MODEL_THINKING="false"
     # Represents the total global pool shared across all parallel slots
     LLAMACPP_MODEL_CONTEXT_SIZE=32768
-    LLAMACPP_EMBED_CONTEXT_SIZE=2048
+    LLAMACPP_EMBED_CONTEXT_SIZE=512
+    # pooling type for embeddings {none,mean,cls,last}. Use model default if unspecified. Use "last" for Qwen2-1.5b-instruct
+    LLAMACPP_EMBED_POOLING="last"
+
     ### Langchain Output Parser: Provider-specific configurations
     ### NOTE: the following configs act as a safeguard to prevent exceeding the maximum context window of the LLM provider. If you encounter errors related to context window limits, consider adjusting these values.
     # ProviderType.OPENAI
@@ -163,8 +169,13 @@ In this guide there will be several steps in which you are required to copy-past
         pip install huggingface_hub
         cd ~/thesis-project
         mkdir -p models/.cache
+        # Configuration example 1
         # LLM: https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF
         # Embedding: https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF
+        # Configuration example 2
+        # LLM: https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf
+        # Embedding: https://huggingface.co/miti99/gte-Qwen2-1.5B-instruct-Q8_0-GGUF
+
         hf download unsloth/gemma-4-E4B-it-GGUF gemma-4-E4B-it-Q4_K_M.gguf --local-dir ~/thesis-project/models/.cache
         mv ~/thesis-project/models/.cache/*.gguf ~/thesis-project/models/llm_model.gguf
         hf download nomic-ai/nomic-embed-text-v2-moe-GGUF nomic-embed-text-v2-moe.Q8_0.gguf --local-dir ~/thesis-project/models/.cache
