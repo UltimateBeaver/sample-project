@@ -14,7 +14,6 @@
 # 1. Environment & Path Initialization
 # =========================================================================
 module purge
-module load apptainer
 module load miniconda3/3.13.25
 module load gcc/12.4.0
 module load nvhpc/25.1
@@ -52,11 +51,22 @@ export PATH=$SCRATCH_FLASH/thesis-project/llama.cpp/build/bin:$PATH
 # =========================================================================
 # 2. Launch Background Infrastructure Services
 # =========================================================================
-echo "Launching Neo4j container via Apptainer..."
-# Set the database username/password matching your .env configurations
-export APPTAINERENV_NEO4J_AUTH="neo4j/password"
+echo "Detecting container runtime..."
+if command -v apptainer &> /dev/null; then
+    CONTAINER_EXEC="apptainer"
+    # Set the database username/password matching your .env configurations
+    export APPTAINERENV_NEO4J_AUTH="neo4j/password"
+elif command -v singularity &> /dev/null; then
+    CONTAINER_EXEC="singularity"
+    export SINGULARITYENV_NEO4J_AUTH="neo4j/password"
+else
+    echo "Error: Neither apptainer nor singularity is installed on this node." >&2
+    exit 1
+fi
+
+echo "Launching Neo4j container via $CONTAINER_EXEC..."
 mkdir -p $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs
-apptainer run --writable-tmpfs --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs ./neo4j.sif &
+$CONTAINER_EXEC run --writable-tmpfs --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs ./neo4j.sif &
 NEO4J_PID=$!
 
 echo "Launching llama.cpp Model and Embedding Servers..."
@@ -89,7 +99,7 @@ sleep 15
 pkill llama-server
 
 # Export the generated Knowledge Graphs using neo4j-admin image
-apptainer exec \
+$CONTAINER_EXEC exec \
     --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data \
     docker://neo4j:latest \
     neo4j-admin database dump neo4j --to-path=/data --overwrite-destination=true

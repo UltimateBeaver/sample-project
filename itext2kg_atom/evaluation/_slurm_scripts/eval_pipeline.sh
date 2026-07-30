@@ -14,7 +14,6 @@
 # 1. Environment & Path Initialization
 # =========================================================================
 module purge
-module load apptainer
 module load miniconda3/3.13.25
 module load gcc/12.4.0
 module load nvhpc/25.1
@@ -66,11 +65,23 @@ echo "Cleaning directories for Neo4j..."
 mkdir -p neo4j/data neo4j/logs
 rm -rf neo4j/data/*
 rm -rf neo4j/logs/*
+
+echo "Detecting container runtime..."
+if command -v apptainer &> /dev/null; then
+    CONTAINER_EXEC="apptainer"
+    # Set the database username/password matching your .env configurations
+    export APPTAINERENV_NEO4J_AUTH="neo4j/password"
+elif command -v singularity &> /dev/null; then
+    CONTAINER_EXEC="singularity"
+    export SINGULARITYENV_NEO4J_AUTH="neo4j/password"
+else
+    echo "Error: Neither apptainer nor singularity is installed on this node." >&2
+    exit 1
+fi
+
 echo "Launching Neo4j container via Apptainer..."
-# Set the database username/password matching your .env configurations
-export APPTAINERENV_NEO4J_AUTH="neo4j/password"
 mkdir -p $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs
-apptainer run --writable-tmpfs \
+$CONTAINER_EXEC run --writable-tmpfs \
     --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/data:/data \
     --bind $SCRATCH_FLASH/thesis-project/sample-project/neo4j/logs:/logs \
     $SCRATCH_FLASH/thesis-project/sample-project/neo4j.sif &
