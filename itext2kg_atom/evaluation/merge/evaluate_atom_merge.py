@@ -333,17 +333,19 @@ async def number_ground_truth_merged_entities(
     
     similar_pairs_count = 0
     n_entities = len(unique_entities_list)
+    similar_nodes_set = set()
     
     for i in range(n_entities):
         for j in range(i + 1, n_entities):
             if similarity_matrix[i][j] > threshold:
-                similar_pairs_count += 1
+                similar_nodes_set.add(i)
+                similar_nodes_set.add(j)
     
-    print(f"   Similar pairs (should be merged): {similar_pairs_count}")
+    print(f"   Nodes involved in similar pairs: {len(similar_nodes_set)}")
     
     # Step 6: Calculate ground truth merged entities
     # Formula: total - unique - similar_pairs
-    ground_truth_merged = total_entities - num_unique - similar_pairs_count
+    ground_truth_merged = total_entities - num_unique + (len(similar_nodes_set) // 2)
     
     print(f"   ✅ Ground truth merged entities: {ground_truth_merged}")
     
@@ -682,17 +684,19 @@ async def number_ground_truth_merged_relations(
     
     similar_pairs_count = 0
     n_relations = len(unique_relations_list)
+    similar_nodes_set = set()
     
     for i in range(n_relations):
         for j in range(i + 1, n_relations):
             if similarity_matrix[i][j] > threshold:
-                similar_pairs_count += 1
+                similar_nodes_set.add(i)
+                similar_nodes_set.add(j)
     
-    print(f"   Similar pairs (should be merged): {similar_pairs_count}")
+    print(f"   Nodes involved in similar pairs: {len(similar_nodes_set)}")
     
     # Step 6: Calculate ground truth merged relations
     # Formula: total - unique - similar_pairs
-    ground_truth_merged = total_relations - num_unique - similar_pairs_count
+    ground_truth_merged = total_relations - num_unique + (len(similar_nodes_set) // 2)
     
     print(f"   ✅ Ground truth merged relations: {ground_truth_merged}")
     
@@ -812,6 +816,7 @@ async def main():
     # Load data
     atom_kg = load_atom_kg(ATOM_KG_PATH)
     df_nyt = load_df_nyt(DF_NYT_PATH)
+    embeddings_model = get_default_embedding_model()
     
     print(f"💾 Entity embeddings cache: {ENTITY_EMBEDDINGS_CACHE}")
     if os.path.exists(ENTITY_EMBEDDINGS_CACHE):
@@ -819,60 +824,76 @@ async def main():
     else:
         print("   📝 Cache file doesn't exist - will create after first run")
     
-    # Calculate Entity Resolution (ER) Precision
+    # ==========================================
+    # ENTITY RESOLUTION (ER) METRICS
+    # ==========================================
     print("\n" + "=" * 80)
-    er_precision, similar_entities = calculate_ER_precision(atom_kg, df_nyt, threshold=THRESHOLD)
+    print("📊 Calculating Entity Resolution (ER) Metrics")
     
-    # Calculate Entity Resolution (ER) Recall
+    similar_entities = find_similar_nodes_atom(atom_kg, similarity_threshold=THRESHOLD)
+    n_entities_atom = calculate_number_of_entities_atom(atom_kg)
+    n_entities_ground_truth = calculate_number_of_entities(df_nyt)
+    ground_truth_merged = await number_ground_truth_merged_entities(df_nyt, embeddings_model, THRESHOLD, ENTITY_EMBEDDINGS_CACHE)
+    
+    # Math Fix: Calculate TP, FP, FN based on merge counts
+    actual_merges_er = n_entities_ground_truth - n_entities_atom
+    
+    tp_er = max(0, min(actual_merges_er, ground_truth_merged) - len(similar_entities))
+    fp_er = max(0, actual_merges_er - ground_truth_merged) # Penalty for over-merging
+    fn_er = max(0, ground_truth_merged - actual_merges_er) + len(similar_entities) # Penalty for under-merging
+    
+    er_precision = tp_er / (tp_er + fp_er) if (tp_er + fp_er) > 0 else 0.0
+    er_recall = tp_er / (tp_er + fn_er) if (tp_er + fn_er) > 0 else 0.0
+    
+    # ==========================================
+    # RELATION RESOLUTION (RR) METRICS
+    # ==========================================
     print("\n" + "=" * 80)
-    er_recall, ground_truth_merged = await calculate_ER_recall(
-        atom_kg, 
-        df_nyt, 
-        get_default_embedding_model(),
-        threshold=THRESHOLD,
-        cache_path=ENTITY_EMBEDDINGS_CACHE
-    )
+    print("📊 Calculating Relation Resolution (RR) Metrics")
     
-    # Calculate Relation Resolution (RR) Precision
-    print("\n" + "=" * 80)
-    rr_precision, similar_relations = calculate_RR_precision(atom_kg, df_nyt, threshold=THRESHOLD)
+    similar_relations = find_similar_relations_atom(atom_kg, THRESHOLD)
+    n_relations_atom = calculate_number_of_relations_atom(atom_kg)
+    n_relations_ground_truth = calculate_number_of_relations(df_nyt)
+    ground_truth_merged_relations = await number_ground_truth_merged_relations(df_nyt, embeddings_model, THRESHOLD, ENTITY_EMBEDDINGS_CACHE)
     
-    # Calculate Relation Resolution (RR) Recall
-    print("\n" + "=" * 80)
-    rr_recall, ground_truth_merged_relations = await calculate_RR_recall(
-        atom_kg, 
-        df_nyt, 
-        get_default_embedding_model(),
-        threshold=THRESHOLD,
-        cache_path=ENTITY_EMBEDDINGS_CACHE
-    )
+    # Math Fix: Calculate TP, FP, FN based on merge counts
+    actual_merges_rr = n_relations_ground_truth - n_relations_atom
     
-    # Display examples of unresolved entities and relations
+    tp_rr = max(0, min(actual_merges_rr, ground_truth_merged_relations) - len(similar_relations))
+    fp_rr = max(0, actual_merges_rr - ground_truth_merged_relations) # Penalty for over-merging
+    fn_rr = max(0, ground_truth_merged_relations - actual_merges_rr) + len(similar_relations) # Penalty for under-merging
+    
+    rr_precision = tp_rr / (tp_rr + fp_rr) if (tp_rr + fp_rr) > 0 else 0.0
+    rr_recall = tp_rr / (tp_rr + fn_rr) if (tp_rr + fn_rr) > 0 else 0.0
+
+    # ==========================================
+    # DISPLAY & OUTPUT
+    # ==========================================
     display_similar_entities_examples(similar_entities, n_examples=20)
     display_similar_relations_examples(similar_relations, n_examples=20)
     
-    # Print final summary
     print("\n" + "=" * 80)
     print("📋 FINAL RESULTS")
     print("=" * 80)
     print(f"Similarity Threshold: {THRESHOLD}")
     print("\n--- Entity Resolution (ER) ---")
     print(f"ER Precision: {er_precision:.4f} ({er_precision*100:.2f}%)")
-    print(f"ER Recall: {er_recall:.4f} ({er_recall*100:.2f}%)")
-    if er_precision > 0 and er_recall > 0:
+    print(f"ER Recall:    {er_recall:.4f} ({er_recall*100:.2f}%)")
+    if (er_precision + er_recall) > 0:
         er_f1 = 2 * (er_precision * er_recall) / (er_precision + er_recall)
-        print(f"ER F1-Score: {er_f1:.4f} ({er_f1*100:.2f}%)")
+        print(f"ER F1-Score:  {er_f1:.4f} ({er_f1*100:.2f}%)")
+        
     print("\n--- Relation Resolution (RR) ---")
     print(f"RR Precision: {rr_precision:.4f} ({rr_precision*100:.2f}%)")
-    print(f"RR Recall: {rr_recall:.4f} ({rr_recall*100:.2f}%)")
-    if rr_precision > 0 and rr_recall > 0:
+    print(f"RR Recall:    {rr_recall:.4f} ({rr_recall*100:.2f}%)")
+    if (rr_precision + rr_recall) > 0:
         rr_f1 = 2 * (rr_precision * rr_recall) / (rr_precision + rr_recall)
-        print(f"RR F1-Score: {rr_f1:.4f} ({rr_f1*100:.2f}%)")
-    print("\n--- Details ---")
-    print(f"Total unresolved entities in ATOM: {len(similar_entities)}")
-    print(f"Ground truth merged entities: {ground_truth_merged}")
-    print(f"Total unresolved relations in ATOM: {len(similar_relations)}")
-    print(f"Ground truth merged relations: {ground_truth_merged_relations}")
+        print(f"RR F1-Score:  {rr_f1:.4f} ({rr_f1*100:.2f}%)")
+        
+    print("\n--- Diagnostic Details ---")
+    print(f"ATOM Entity Merges Performed:   {actual_merges_er} (Expected: {ground_truth_merged})")
+    print(f"ATOM Relation Merges Performed: {actual_merges_rr} (Expected: {ground_truth_merged_relations})")
+    print(f"False Positives (Over-merging): Entities = {fp_er}, Relations = {fp_rr}")
     print("=" * 80)
     
     return {
@@ -880,11 +901,7 @@ async def main():
         'er_recall': er_recall,
         'rr_precision': rr_precision,
         'rr_recall': rr_recall,
-        'threshold': THRESHOLD,
-        'similar_entities': similar_entities,
-        'similar_relations': similar_relations,
-        'ground_truth_merged': ground_truth_merged,
-        'ground_truth_merged_relations': ground_truth_merged_relations
+        'threshold': THRESHOLD
     }
 
 
