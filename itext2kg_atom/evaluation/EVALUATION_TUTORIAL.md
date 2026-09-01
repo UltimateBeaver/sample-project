@@ -139,13 +139,13 @@ The chart shows the number of factoids on the X axis and the total processing ho
 
 ---
 
-### Merge (ATOM, itext2kg and Graphiti)
+### Merge (ATOM only)
 
-Execute the following commands to analyze the merge performances of ATOM, Itext2kg and Graphiti frameworks. <br> Make sure your **EVAL_INPUT_KNOWLEDGE_GRAPH_PATH** contains the correct knowledge graph file, coherent with the **EVAL_INPUT_DATASET_PATH**, otherwise these scripts will produce wrong results!
+Execute the following commands to analyze the merge performances of ATOM framework. <br> Make sure your **EVAL_INPUT_KNOWLEDGE_GRAPH_PATH** contains the correct knowledge graph file, coherent with the **EVAL_INPUT_DATASET_PATH**, otherwise these scripts will produce wrong results!
+Note: there are other merge evaluation scripts for these other frameworks: Itext2kg and Graphiti. They have nothing to do with the main ATOM evaluation pipeline, they have been only left by original ATOM developers.
 
 ```bash
-python ./merge/evaluate_atom_merge.py
-python ./merge/evaluate_itext2kg_merge.py
+python ./merge/evaluate_atom_merge.py -p <your-model-postfix>
 ```
 
 | Output metric name | Formula                                                                          | Description                                                                                  |

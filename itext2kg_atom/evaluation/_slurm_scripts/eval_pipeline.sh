@@ -131,9 +131,7 @@ python ./latency/testing_itext2kg.py
 python ./latency/plot_latency_comparison.py
 
 echo "--- Running Merge Tests ---"
-python ./merge/evaluate_atom_merge.py
-python ./merge/evaluate_itext2kg_merge.py
-python ./merge/evaluate_graphiti_merge.py
+python ./merge/evaluate_atom_merge.py -p $MODEL_POSTFIX
 
 echo "--- Running Quintuples Quality Tests ---"
 python ./quintuples_quality/calculate_quintuples_quality.py -p $MODEL_POSTFIX

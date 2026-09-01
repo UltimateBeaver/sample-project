@@ -7,6 +7,7 @@ Precision: Measures how many entities ATOM should merge but didn't (false negati
 Recall: Measures how well ATOM is merging entities compared to ground truth
 """
 
+import argparse
 import ast
 import os
 from pathlib import Path
@@ -19,8 +20,8 @@ from typing import List, Dict, Any, Tuple
 import asyncio
 from models.models import get_default_model, get_default_embedding_model
 from env_config import (
-    eval_input_dataset_path, eval_input_knowledge_graph_path, eval_cache_path, num_rows_to_process,
-    column_name_quintuples_ground_truth
+    eval_output_dataset_path, eval_input_knowledge_graph_path, eval_cache_path, num_rows_to_process,
+    column_name_quintuples_extracted, eval_model_postfixes_list
 )
 
 # Add the project root to Python path (same pattern as other scripts)
@@ -36,7 +37,8 @@ sys.path.append(str(project_root))
 ATOM_KG_PATH = project_root / eval_input_knowledge_graph_path
 
 # Path to the df_nyt pickle file (contains ground truth data)
-DF_NYT_PATH = project_root / eval_input_dataset_path
+DF_NYT_PATH = project_root / eval_output_dataset_path
+COL_NAME_QUINTUPLES = "will be overwritten in main"
 
 # Similarity threshold for determining duplicates
 THRESHOLD = 0.8
@@ -107,7 +109,7 @@ def load_df_nyt(path: str) -> pd.DataFrame:
         df = df.head(num_rows_to_process)
     
     # Normalize quintuples list of eah row
-    df[column_name_quintuples_ground_truth] = df[column_name_quintuples_ground_truth].apply(normalize_quintuples_list)
+    df[COL_NAME_QUINTUPLES] = df[COL_NAME_QUINTUPLES].apply(normalize_quintuples_list)
     print(f"   ✅ Loaded dataframe with {len(df)} rows")
     return df
 
@@ -224,7 +226,7 @@ def find_similar_nodes_atom(atom_kg: Any, similarity_threshold: float = 0.9) -> 
     return similar_pairs
 
 def calculate_number_of_entities(df_nyt):
-    all_entities = [relation[0] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]] + [relation[2] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]]
+    all_entities = [relation[0] for relation in df_nyt[COL_NAME_QUINTUPLES].cumsum().iloc[-1]] + [relation[2] for relation in df_nyt[COL_NAME_QUINTUPLES].cumsum().iloc[-1]]
     #non_duplicated_entities = list(set(all_entities))
     return len(all_entities)
 
@@ -233,7 +235,7 @@ def calculate_number_of_entities_(df_nyt: pd.DataFrame) -> int:
     all_entities = []
     
     # Collect all entities from quintuples_g_truth
-    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
+    for quintuples in df_nyt[COL_NAME_QUINTUPLES]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -281,7 +283,7 @@ async def number_ground_truth_merged_entities(
     
     # Step 1: Get all entities (with duplicates)
     all_entities = []
-    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
+    for quintuples in df_nyt[COL_NAME_QUINTUPLES]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -535,11 +537,14 @@ def find_similar_relations_atom(
 
 def calculate_number_of_relations_atom(atom_kg: Any) -> int:
     """Calculate the number of unique relations in ATOM graph."""
-    unique_relation_names = list(set([relationship.name for relationship in atom_kg.relationships]))
-    return len(unique_relation_names)
+    # unique_relation_names = list(set([relationship.name for relationship in atom_kg.relationships]))
+    # return len(unique_relation_names)
+
+    # We need to return the complete relationship instances instead of the unique types, otherwise this would produce wrong Precision and Recall metrics!
+    return len(atom_kg.relationships)
 
 def calculate_number_of_relations(df_nyt):
-    all_relations = [relation[1] for relation in df_nyt[column_name_quintuples_ground_truth].cumsum().iloc[-1]]
+    all_relations = [relation[1] for relation in df_nyt[COL_NAME_QUINTUPLES].cumsum().iloc[-1]]
     return len(all_relations)
 
 
@@ -548,7 +553,7 @@ def calculate_number_of_relations_(df_nyt: pd.DataFrame) -> int:
     all_relations = []
     
     # Collect all relations from quintuples_g_truth
-    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
+    for quintuples in df_nyt[COL_NAME_QUINTUPLES]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -632,7 +637,7 @@ async def number_ground_truth_merged_relations(
     
     # Step 1: Get all relations (with duplicates)
     all_relations = []
-    for quintuples in df_nyt[column_name_quintuples_ground_truth]:
+    for quintuples in df_nyt[COL_NAME_QUINTUPLES]:
         if isinstance(quintuples, list):
             for relation in quintuples:
                 if len(relation) >= 3:
@@ -802,6 +807,12 @@ def display_similar_relations_examples(similar_relations: List[Dict[str, Any]], 
         if i < min(n_examples, len(similar_relations)):
             print("   " + "-" * 70)
 
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Extract factoids from raw news paragraphs - Factoids Analysis')
+    parser.add_argument('--model-postfix', '-p', type=str, required=True,
+                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
+    return parser.parse_args()
 
 # ============================================================================
 # MAIN FUNCTION
@@ -812,6 +823,18 @@ async def main():
     print("=" * 80)
     print("🚀 ATOM Entity & Relation Resolution Evaluation")
     print("=" * 80)
+
+    # Parse command line arguments
+    args = parse_arguments()
+
+    if not args.model_postfix:
+        print('--model-postfix arg not provided')
+        return
+    if args.model_postfix not in eval_model_postfixes_list:
+        print(f'Unsupported --model-postfix arg. Supported ones are: {eval_model_postfixes_list}')
+        return
+
+    globals()['COL_NAME_QUINTUPLES'] = f"{column_name_quintuples_extracted}_{args.model_postfix}"
     
     # Load data
     atom_kg = load_atom_kg(ATOM_KG_PATH)
@@ -893,7 +916,8 @@ async def main():
     print("\n--- Diagnostic Details ---")
     print(f"ATOM Entity Merges Performed:   {actual_merges_er} (Expected: {ground_truth_merged})")
     print(f"ATOM Relation Merges Performed: {actual_merges_rr} (Expected: {ground_truth_merged_relations})")
-    print(f"False Positives (Over-merging): Entities = {fp_er}, Relations = {fp_rr}")
+    print(f"False Positives (Over-merging):  Entities = {fp_er}, Relations = {fp_rr}")
+    print(f"False Negatives (Under-merging): Entities = {fn_er}, Relations = {fn_rr}")
     print("=" * 80)
     
     return {
