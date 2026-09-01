@@ -47,3 +47,6 @@ matplotlib
 
 # Graphiti framework for evaluation comparison between ATOM and itext2kg
 graphiti_core
+
+# Unsupervised evaluation
+ragas>=0.4,<0.5

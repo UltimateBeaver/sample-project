@@ -259,3 +259,13 @@ pd.read_pickle("dataset_output.pkl").to_excel("dataset_output.xlsx")
 pd.read_excel("dataset_input.xlsx").to_excel("dataset_input.pkl")
 quit()
 ```
+
+# Unsupervised evaluation
+The following tests are related to unsupervised evaluation, using an LLM as a judge methodology.
+
+```bash
+# Run unsupervised evaluation for default dataset (2020-nyt-covid19)
+python ./unsupervised/eval_ragas.py -p <your-model-postfix>
+# Run unsupervised evaluation for a non english dataset (Annotazioni_1.xlsx)
+python ./unsupervised/eval_ragas.py --dataset "../datasets/atom/my_test_datasets/Annotazioni_1_with_factoids.xlsx"
+```

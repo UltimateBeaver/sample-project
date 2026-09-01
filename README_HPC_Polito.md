@@ -251,7 +251,7 @@ In this guide there will be several steps in which you are required to copy-past
 Execute the provided Graph Utility tool, through the following commands:
 ```bash
 # Move to the python virtual environment (if not already there)
-venv/Scripts/activate
+source venv/bin/activate
 # Make sure Neo4j container and Ollama/llama_cpp_servers are running!
 # Finally execute the Graph Utility tool
 python ./utils/kg_utility/graph_utility.py

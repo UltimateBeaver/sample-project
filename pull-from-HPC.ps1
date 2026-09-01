@@ -68,11 +68,11 @@ docker stop $DOCKER_CONTAINER_NAME
 Write-Host "`n[4/4] Executing admin database restoration tool..." -ForegroundColor Yellow
 
 # Remove old database files to ensure clean import
-# $OLD_DATABASE_DIR = "$LOCAL_DOCKER_DATA\databases\neo4j"
-# if (Test-Path $OLD_DATABASE_DIR) {
-#     Write-Host "Removing old database directory to ensure clean import..." -ForegroundColor Gray
-#     Remove-Item -Recurse -Force $OLD_DATABASE_DIR
-# }
+$OLD_DATABASE_DIR = "$LOCAL_DOCKER_DATA\databases\neo4j"
+if (Test-Path $OLD_DATABASE_DIR) {
+    Write-Host "Removing old database directory to ensure clean import..." -ForegroundColor Gray
+    Remove-Item -Recurse -Force $OLD_DATABASE_DIR
+}
 
 # Using a one-off disposable worker container avoids index fragmentation or permission bugs
 docker run --rm `
