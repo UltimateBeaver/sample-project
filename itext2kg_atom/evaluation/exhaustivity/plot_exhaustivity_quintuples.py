@@ -331,6 +331,232 @@ async def evaluate_models_by_token_count(df, model_names, lg_kg_construction, th
     logger.info(f"Evaluation completed for all models. Total results: {sum(len(v) for v in results.values())} samples")
     return results
 
+## For bucket visualization: commented as it left blank bars on the plot
+# def create_publication_exhaustivity_plot(results, model_names=None):
+#     """
+#     Create a publication-quality bar plot showing semantic and temporal recall by token count.
+    
+#     Args:
+#         results: Dictionary with results for each model
+#         model_names: List of model names (defaults to PUBLICATION_MODELS for cleaner plot)
+        
+#     Returns:
+#         matplotlib figure and axes objects
+#     """
+#     # Use publication models for cleaner plot if not specified
+#     if model_names is None:
+#         model_names = PUBLICATION_MODELS
+    
+#     logger.info(f"Creating publication-quality exhaustivity plot for models: {model_names}")
+    
+#     # Set matplotlib parameters for publication quality
+#     plt.rcParams.update({
+#         'font.size': FONT_SIZES['tick_labels'],
+#         'axes.labelsize': FONT_SIZES['axis_labels'],
+#         'axes.titlesize': FONT_SIZES['title'],
+#         'legend.fontsize': FONT_SIZES['legend'],
+#         'xtick.labelsize': FONT_SIZES['tick_labels'],
+#         'ytick.labelsize': FONT_SIZES['tick_labels'],
+#         'font.family': 'serif',
+#         'font.serif': ['Times New Roman'],
+#         'text.usetex': False,  # Set to True if LaTeX is available
+#         'figure.dpi': DPI,
+#         'savefig.dpi': DPI,
+#         'axes.linewidth': 0.8,
+#         'grid.linewidth': 0.5,
+#         'lines.linewidth': 1.0
+#     })
+    
+#     # Prepare data
+#     plot_data = []
+#     for model_name, model_results in results.items():
+#         for result in model_results:
+#             plot_data.append({
+#                 'model': model_name.lower(),
+#                 'token_count': result['token_count'],
+#                 'recall': result['recall'],
+#                 'recall_t': result['recall_t']
+#             })
+    
+#     if not plot_data:
+#         logger.error("No data to plot!")
+#         return None, None
+    
+#     df_plot = pd.DataFrame(plot_data)
+#     logger.info(f"Prepared plot data with {len(df_plot)} data points")
+    
+#     min_tc = df_plot['token_count'].min()
+#     max_tc = df_plot['token_count'].max()
+#     num_unique = df_plot['token_count'].nunique()
+
+#     # Helper function for pretty human-readable numbers (e.g., 1500 -> 1.5k)
+#     def format_val(val):
+#         if val >= 1000:
+#             return f"{val/1000:.1f}k"
+#         return f"{int(round(val))}"
+    
+#     if num_unique <= 1 or min_tc == max_tc:
+#         # Fallback if there's only 1 data point or all token counts are completely identical
+#         bin_label = format_val(min_tc) if not pd.isna(min_tc) else "0"
+#         df_plot['token_bins'] = bin_label
+#         unique_bins = [bin_label]
+#     else:
+#         # Determine appropriate number of bins (max 10 bins, or fewer if there are very few unique records)
+#         num_bins = min(10, num_unique)
+        
+#         # Calculate exactly spaced edges to wrap our specific data range cleanly
+#         edges = np.linspace(min_tc, max_tc, num_bins + 1)
+#         edges[0] -= 1   # Extend lower boundary slightly to guarantee inclusion of min_tc
+#         edges[-1] += 1  # Extend upper boundary slightly to guarantee inclusion of max_tc
+        
+#         # Build clean interval labels dynamically matching the exact spans
+#         labels = []
+#         step = (max_tc - min_tc) / num_bins
+#         use_exact = step < 100  # Fallback to exact integers if bin range is narrow
+
+#         for i in range(num_bins):
+#             start = min_tc + i * step
+#             end = min_tc + (i + 1) * step
+#             s_str = str(int(round(start))) if use_exact else format_val(start)
+#             e_str = str(int(round(end))) if use_exact else format_val(end)
+#             lbl = f"{s_str}-{e_str}" if s_str != e_str else s_str
+#             labels.append(lbl)
+
+#         df_plot['token_bins'] = pd.cut(df_plot['token_count'], bins=edges, labels=labels, ordered=False)
+#         unique_bins = list(dict.fromkeys(labels))
+
+#     # Group by the adaptive bins instead of individual integers
+#     grouped = df_plot.groupby(['token_bins', 'model'], observed=False).agg({
+#         'recall': 'mean',
+#         'recall_t': 'mean'
+#     }).reset_index()
+
+#     n_models = len([m for m in model_names if m in results])
+    
+#     # Create figure with publication dimensions
+#     fig, ax = plt.subplots(figsize=(FIGURE_WIDTH, FIGURE_HEIGHT), dpi=DPI)
+    
+#     # Set up bar positions
+#     x = np.arange(len(unique_bins))
+#     width = 0.12  # Slightly reduced bar width to prevent touching
+    
+#     # Plot bars for each model
+#     legend_elements = []
+#     for i, model_name in enumerate(model_names):
+#         if model_name not in results:
+#             continue
+            
+#         model_data = grouped[grouped['model'] == model_name]
+        
+#         recalls = []
+#         recalls_t = []
+        
+#         for bin_name in unique_bins:
+#             token_data = model_data[model_data['token_bins'] == bin_name]
+#             if len(token_data) > 0:
+#                 recalls.append(token_data['recall'].iloc[0])
+#                 recalls_t.append(token_data['recall_t'].iloc[0])
+#             else:
+#                 recalls.append(0)
+#                 recalls_t.append(0)
+        
+#         # Calculate bar positions
+#         x_pos = x + (i - (n_models-1)/2) * width
+        
+#         # Get color for this model
+#         color = COLORS.get(model_name, '#666666')
+        
+#         # Semantic recall bars (full bars with subtle background)
+#         bars_semantic = ax.bar(x_pos, recalls, width, 
+#                               color=color, alpha=0.85, 
+#                               edgecolor='black', linewidth=0.6,
+#                               zorder=2)
+        
+#         # Temporal recall bars (overlaid with pattern and slight color variation)
+#         temporal_color = color  # Same base color
+#         bars_temporal = ax.bar(x_pos, recalls_t, width,
+#                               color=temporal_color, alpha=0.65,
+#                               edgecolor='black', linewidth=0.6,
+#                               hatch='///', zorder=3)
+        
+#         # Add to legend with precise model names
+#         display_name = MODEL_DISPLAY_NAMES.get(model_name, model_name.upper())
+#         legend_elements.append((bars_semantic[0], f'{display_name} - Semantic'))
+#         legend_elements.append((bars_temporal[0], f'{display_name} - Temporal'))
+    
+#     # Customize plot for publication
+#     ax.set_xlabel('Token count as context', fontsize=FONT_SIZES['axis_labels'], fontweight='bold')
+#     ax.set_ylabel('Exhaustivity', fontsize=FONT_SIZES['axis_labels'], fontweight='bold')
+#     ax.set_title('Exhaustivity of quintuples', fontsize=FONT_SIZES['title'], fontweight='bold', pad=20)
+    
+#     # Set y-axis range [0, 0.6] as requested
+#     ax.set_ylim(0, 0.6)
+    
+#     # Add horizontal gridlines at specified intervals (improved visibility)
+#     gridlines = [0.1, 0.2, 0.3, 0.4, 0.5]
+#     for gridline in gridlines:
+#         ax.axhline(y=gridline, color='gray', linestyle='-', alpha=0.4, linewidth=0.6, zorder=1)
+    
+#     # Add minor tick marks on y-axis
+#     ax.set_yticks([0.05, 0.15, 0.25, 0.35, 0.45, 0.55], minor=True)
+#     ax.tick_params(axis='y', which='minor', length=3, width=0.5)
+    
+#     # Set x-axis with improved readability
+#     ax.set_xticks(x)
+    
+#     ax.set_xticklabels(unique_bins, 
+#                        rotation=45, ha='right', fontsize=FONT_SIZES['tick_labels'])
+    
+#     # Extend x-axis limits to use full plot width
+#     ax.set_xlim(-0.5, len(unique_bins) - 0.5)
+    
+#     # Create custom legend with single-column layout for right-side placement
+#     handles = []
+#     labels = []
+#     for handle, label in legend_elements:
+#         handles.append(handle)
+#         labels.append(label)
+    
+#     # Place legend outside plot area on the right side with single-column layout
+#     ax.legend(handles, labels, bbox_to_anchor=(1.02, 1), loc='upper left', 
+#               fontsize=FONT_SIZES['legend'], frameon=True, fancybox=False, shadow=False,
+#               ncol=1, handletextpad=0.5, handlelength=1.2,
+#               framealpha=0.9, edgecolor='black', facecolor='white')
+    
+#     # Increase axis border line width for better print quality
+#     for spine in ax.spines.values():
+#         spine.set_linewidth(1.2)
+    
+#     # Remove top and right spines for cleaner look
+#     ax.spines['top'].set_visible(False)
+#     ax.spines['right'].set_visible(False)
+    
+#     # Set grid below data
+#     ax.set_axisbelow(True)
+    
+#     # Improve tick parameters for better print quality
+#     ax.tick_params(axis='both', which='major', width=1.0, length=4)
+#     ax.tick_params(axis='x', which='major', pad=8)  # Add padding for rotated labels
+    
+#     # Adjust layout to accommodate right-side legend and rotated x-axis labels
+#     plt.tight_layout()
+#     plt.subplots_adjust(bottom=0.15, right=0.75)  # Extra space for rotated labels and right legend
+    
+#     # Save both PNG and PDF formats
+#     logger.info("Saving plot in multiple formats")
+#     plt.savefig(str(OUTPUT_PLOT_PNG), dpi=DPI, bbox_inches='tight', 
+#                 facecolor='white', edgecolor='none', pad_inches=0.1)
+#     plt.savefig(str(OUTPUT_PLOT_PDF), dpi=DPI, bbox_inches='tight', 
+#                 facecolor='white', edgecolor='none', format='pdf', pad_inches=0.1)
+    
+#     print("📊 Publication plot saved to:")
+#     print(f"   PNG: {OUTPUT_PLOT_PNG}")
+#     print(f"   PDF: {OUTPUT_PLOT_PDF}")
+#     logger.info(f"Plot saved to {OUTPUT_PLOT_PNG} and {OUTPUT_PLOT_PDF}")
+    
+#     return fig, ax
+
+
 
 def create_publication_exhaustivity_plot(results, model_names=None):
     """
@@ -385,17 +611,45 @@ def create_publication_exhaustivity_plot(results, model_names=None):
     df_plot = pd.DataFrame(plot_data)
     logger.info(f"Prepared plot data with {len(df_plot)} data points")
     
-    # Group by token count and calculate means
-    grouped = df_plot.groupby(['token_count', 'model']).agg({
+    min_tc = df_plot['token_count'].min()
+    max_tc = df_plot['token_count'].max()
+    num_unique = df_plot['token_count'].nunique()
+
+    # Helper function for pretty human-readable numbers (e.g., 1500 -> 1.5k)
+    def format_val(val):
+        if val >= 1000:
+            return f"{val/1000:.1f}k"
+        return f"{int(round(val))}"
+    
+    if num_unique <= 1 or min_tc == max_tc:
+        bin_label = format_val(min_tc) if not pd.isna(min_tc) else "0"
+        df_plot['token_bins'] = bin_label
+        unique_bins = [bin_label]
+    else:
+        num_bins = min(10, num_unique)
+        edges = np.linspace(min_tc, max_tc, num_bins + 1)
+        edges[0] -= 1   
+        edges[-1] += 1  
+        
+        labels = []
+        for i in range(num_bins):
+            start = min_tc + i * (max_tc - min_tc) / num_bins
+            end = min_tc + (i + 1) * (max_tc - min_tc) / num_bins
+            s_str, e_str = format_val(start), format_val(end)
+            labels.append(f"{s_str}-{e_str}" if s_str != e_str else s_str)
+            
+        df_plot['token_bins'] = pd.cut(df_plot['token_count'], bins=edges, labels=labels, ordered=False)
+        unique_bins = list(dict.fromkeys(labels))
+
+    # Group by the adaptive bins instead of individual integers
+    grouped = df_plot.groupby(['token_bins', 'model'], observed=True).agg({
         'recall': 'mean',
         'recall_t': 'mean'
     }).reset_index()
-    
-    # Get unique token counts and sort them - reduce density for publication
-    unique_tokens = sorted(grouped['token_count'].unique())
-    # Show every 3rd token count to reduce clutter and improve readability
-    unique_tokens_reduced = unique_tokens[::3]
-    logger.info(f"Plotting {len(unique_tokens_reduced)} token count points (reduced from {len(unique_tokens)})")
+
+    # 2. Add immediately after, to prune unique_bins to match actual data
+    bins_in_data = set(grouped['token_bins'].astype(str))
+    unique_bins = [b for b in unique_bins if b in bins_in_data]
     
     n_models = len([m for m in model_names if m in results])
     
@@ -403,8 +657,8 @@ def create_publication_exhaustivity_plot(results, model_names=None):
     fig, ax = plt.subplots(figsize=(FIGURE_WIDTH, FIGURE_HEIGHT), dpi=DPI)
     
     # Set up bar positions
-    x = np.arange(len(unique_tokens_reduced))
-    width = 0.12  # Slightly reduced bar width to prevent touching
+    x = np.arange(len(unique_bins))
+    width = 0.12
     
     # Plot bars for each model
     legend_elements = []
@@ -412,13 +666,13 @@ def create_publication_exhaustivity_plot(results, model_names=None):
         if model_name not in results:
             continue
             
-        model_data = grouped[grouped['model'] == model_name]
+        model_data = grouped[grouped['model'] == model_name.lower()]
         
         recalls = []
         recalls_t = []
         
-        for token_count in unique_tokens_reduced:
-            token_data = model_data[model_data['token_count'] == token_count]
+        for bin_name in unique_bins:
+            token_data = model_data[model_data['token_bins'] == bin_name]
             if len(token_data) > 0:
                 recalls.append(token_data['recall'].iloc[0])
                 recalls_t.append(token_data['recall_t'].iloc[0])
@@ -471,19 +725,19 @@ def create_publication_exhaustivity_plot(results, model_names=None):
     ax.set_xticks(x)
     
     # Format x-axis labels with scientific notation for readability
-    def format_token_count(tc):
-        if tc >= 10000:
-            return f'{tc/1000:.1f}k'
-        elif tc >= 1000:
-            return f'{tc/1000:.1f}k'
-        else:
-            return f'{int(tc)}'
+    # def format_token_count(tc):
+    #     if tc >= 10000:
+    #         return f'{tc/1000:.1f}k'
+    #     elif tc >= 1000:
+    #         return f'{tc/1000:.1f}k'
+    #     else:
+    #         return f'{int(tc)}'
     
-    ax.set_xticklabels([format_token_count(tc) for tc in unique_tokens_reduced], 
+    ax.set_xticklabels(unique_bins, 
                        rotation=45, ha='right', fontsize=FONT_SIZES['tick_labels'])
     
-    # Extend x-axis limits to use full plot width (critical fix)
-    ax.set_xlim(-0.5, len(unique_tokens_reduced) - 0.5)
+    # Extend x-axis limits to use full plot width 
+    ax.set_xlim(-0.5, len(unique_bins) - 0.5)
     
     # Create custom legend with single-column layout for right-side placement
     handles = []
