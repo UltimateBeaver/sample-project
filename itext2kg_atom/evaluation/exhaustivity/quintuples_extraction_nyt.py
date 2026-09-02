@@ -38,7 +38,7 @@ sys.path.append(str(project_root))
 
 from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg.atom.models import RelationshipsExtractor, Prompt
-from models.models import get_default_model, get_default_embedding_model
+from models.models import get_default_model_no_reasoning, get_default_embedding_model
 from env_config import (
     column_name_quintuples_extracted_from_raw_text, column_name_date, column_name_date_translated_paragraph, column_name_quintuples_raw_prompt_tokenc,
     eval_input_dataset_path, eval_output_dataset_path, num_rows_to_process, doc_parser_batch_size, eval_checkpoint_quintuples_path, eval_model_postfixes_list
@@ -79,7 +79,7 @@ BATCH_SIZE: int = doc_parser_batch_size
 CHECKPOINT_FILE: Path = project_root / eval_checkpoint_quintuples_path
 
 lg_kg_construction = LangchainOutputParser(
-   llm_model=get_default_model(),
+   llm_model=get_default_model_no_reasoning(),
    embeddings_model=get_default_embedding_model()
 )
 

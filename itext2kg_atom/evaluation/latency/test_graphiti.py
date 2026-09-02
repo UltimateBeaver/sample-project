@@ -31,7 +31,7 @@ from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 from graphiti_core.llm_client import OpenAIClient, LLMConfig
 
-from models.models import get_default_model, get_default_embedding_model
+from models.models import get_default_model_no_reasoning, get_default_embedding_model
 from env_config import (
     neo4j_uri, neo4j_username, neo4j_password,
     provider_openai_max_elements_per_batch,
@@ -228,7 +228,7 @@ def setup_graphiti() -> Graphiti:
     # )
     
     # Initialize OpenAI client
-    default_llm_langchain = get_default_model()
+    default_llm_langchain = get_default_model_no_reasoning()
     default_embedding_langchain = get_default_embedding_model()
 
     llm_config = LLMConfig(

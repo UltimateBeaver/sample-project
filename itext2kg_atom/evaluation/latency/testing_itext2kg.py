@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Tuple, Optional
 from itext2kg import iText2KG
 from itext2kg.atom.models import KnowledgeGraph
-from models.models import get_default_model, get_default_embedding_model
+from models.models import get_default_model_no_reasoning, get_default_embedding_model
 from env_config import (
     provider_openai_max_elements_per_batch, num_rows_to_process, column_name_date, column_name_factoids_ground_truth,
     eval_input_dataset_path, eval_cache_path
@@ -527,7 +527,7 @@ async def run_itext2kg_batch_processing():
         return None
     
     # Initialize iText2KG instance
-    llm_model = get_default_model()
+    llm_model = get_default_model_no_reasoning()
     llm_model.max_tokens = 2048 # overwrite default config (32768) to prevent long waiting times during retries.
     llm_model.temperature = 0.1  # Introduces slight entropy to break deterministic loops
     #llm_model.model_kwargs = {"stop": ["```", "}\n}", "]\n}"]}  # Hard circuit breakers
@@ -562,7 +562,7 @@ if __name__ == "__main__":
     print(f"  ENT_THRESHOLD: {ENT_THRESHOLD}")
     print(f"  REL_THRESHOLD: {REL_THRESHOLD}")
     print(f"  DATA_FILE: {DATA_FILE_PATH}")
-    print(f"  LLM Model: {get_default_model().model_name}")
+    print(f"  LLM Model: {get_default_model_no_reasoning().model_name}")
     print(f"  Embeddings Model: {get_default_embedding_model().model}")
     print("="*50)
     

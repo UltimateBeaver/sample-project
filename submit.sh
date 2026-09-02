@@ -34,7 +34,7 @@ find . -maxdepth 1 -type f ! -name "*$(squeue -u $(whoami) -h -o '%A')*" -exec m
 # mkdir -p $SCRATCH_FLASH/thesis-project
 # cp -r $HOME/thesis-project/sample-project $SCRATCH_FLASH/thesis-project
 echo "Syncing required project files from $HOME to $SCRATCH_FLASH..."
-rsync -av --exclude='.git' --exclude='logs' \
+rsync -av --exclude='.git' --exclude='logs' --exclude='neo4j/data' \
 $HOME/thesis-project/sample-project/ \
 $SCRATCH_FLASH/thesis-project/sample-project/
 

@@ -18,7 +18,7 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Dict, Any, Tuple
 import asyncio
-from models.models import get_default_model, get_default_embedding_model
+from models.models import get_default_embedding_model
 from env_config import (
     eval_output_dataset_path, eval_input_knowledge_graph_path, eval_cache_path, num_rows_to_process,
     column_name_quintuples_extracted, eval_model_postfixes_list

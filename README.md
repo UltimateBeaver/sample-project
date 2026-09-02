@@ -158,7 +158,7 @@ Sample repo for master's degree thesis
     <br>Ollama will use ChatOllama Langchain API.
 
 * If you want to use llama.cpp, you have to download the right docker image (or directly the llama.cpp binaries) that match your OS and GPU. A bare metal setup  is provided below (tested with Windows 11 with AMD Radeon GPU):
-    1. Go to the official llama.cpp https://github.com/ggml-org/llama.cpp/releases and look for the newest release. Download the one that matches your hardware (in my case a Windows zip file compiled for ROCm/HIP)
+    1. Go to the official llama.cpp https://github.com/ggml-org/llama.cpp/releases and look for the newest release. Download the one that matches your hardware (in my case a Windows zip file compiled for ROCm/HIP). Make sure you have the latest ROCm library version installed in your system: https://github.com/lemonade-sdk/llamacpp-rocm
     2. Download your chosen model in GGUF format (e.g., a quantized version of Gemma 4) from Hugging Face or LM studio repo:
         ```sh
             # Configuration example 1

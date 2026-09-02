@@ -31,7 +31,7 @@ from pathlib import Path
 
 from itext2kg_atom.evaluation.exhaustivity.quintuples_extraction_nyt_from_factoids import extract_quintuples_wrapper as quintuples_extraction_from_factoids
 from itext2kg_atom.evaluation.exhaustivity.quintuples_extraction_nyt import extract_raw_quintuples_wrapper as quintuples_extraction_from_raw_text
-from models.models import get_default_model, get_default_embedding_model
+from models.models import get_default_model_no_reasoning, get_default_embedding_model
 from env_config import (
     column_name_quintuples_extracted, column_name_quintuples_extracted_from_raw_text,
     eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list
@@ -735,7 +735,7 @@ async def main():
         logger.info("Initializing language model components")
         try:
             lg_kg_construction = LangchainOutputParser(
-                llm_model=get_default_model(),
+                llm_model=get_default_model_no_reasoning(),
                 embeddings_model=get_default_embedding_model()
             )
             print("   ✅ Language model components initialized")

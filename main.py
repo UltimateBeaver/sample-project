@@ -14,6 +14,7 @@ from env_config import *
 
 # Get default llm model and embedding model
 base_llm_model = get_default_model()
+base_llm_model_no_reasoning = get_default_model_no_reasoning()
 base_embeddings_model = get_default_embedding_model()
 
 # Define a helper function to convert the dataframe's atomic facts into a dictionary,
@@ -106,8 +107,8 @@ async def main():
     # Convert the dataframe into the required dictionary format
     news_covid_dict = to_dictionary(news_covid, column_name_factoids_extracted)
 
-    # Initialize the ATOM pipeline with the LLM and embedding models
-    atom = Atom(llm_model=base_llm_model, embeddings_model=base_embeddings_model)
+    # Initialize the ATOM pipeline with the LLM (reasoning disabled for quintuples extraction) and embedding models
+    atom = Atom(llm_model=base_llm_model_no_reasoning, embeddings_model=base_embeddings_model)
 
     # Initialize the Neo4j storage with connection details from environment variables
     neo4j = Neo4jStorage(

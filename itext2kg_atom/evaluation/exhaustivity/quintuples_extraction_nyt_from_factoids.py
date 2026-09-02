@@ -33,7 +33,7 @@ sys.path.append(str(project_root))
 
 from itext2kg.llm_output_parsing.langchain_output_parser import LangchainOutputParser
 from itext2kg.atom.models import RelationshipsExtractor, Prompt
-from models.models import get_default_model, get_default_embedding_model
+from models.models import get_default_model_no_reasoning, get_default_embedding_model
 from env_config import (
     column_name_quintuples_extracted, column_name_date, column_name_factoids_ground_truth, column_name_factoids_extracted, column_name_quintuples_prompt_tokenc, 
     eval_input_dataset_path, eval_output_dataset_path, eval_model_postfixes_list, num_rows_to_process, num_rows_to_process, enable_parallel_quintuples_extraction
@@ -70,7 +70,7 @@ QUINTUPLES_COL_NAME: str = column_name_quintuples_extracted
 SAMPLER_K: int | None = None
 
 lg_kg_construction = LangchainOutputParser(
-   llm_model=get_default_model(),
+   llm_model=get_default_model_no_reasoning(),
    embeddings_model=get_default_embedding_model()
 )
 

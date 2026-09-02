@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+# LLama.cpp config
+llamacpp_num_parallel_slots = int(os.getenv("LLAMACPP_MODEL_NUM_PARALLEL_SLOTS", 1))
 # API keys
 openai_api_key =        os.getenv("OPENAI_API_KEY")
 llamacpp_embed_base =   os.getenv("LLAMACPP_EMBED_BASE")

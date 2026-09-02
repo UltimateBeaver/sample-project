@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Tuple, Optional
 from itext2kg import Atom
 from itext2kg.atom.models import KnowledgeGraph
-from models.models import get_default_model, get_default_embedding_model
+from models.models import get_default_model_no_reasoning, get_default_embedding_model
 from env_config import (
     provider_openai_max_elements_per_batch, num_rows_to_process, column_name_date, column_name_factoids_ground_truth,
     eval_input_dataset_path, eval_cache_path
@@ -562,7 +562,7 @@ async def run_covid_batch_processing():
         return None
     
     # Initialize ATOM instance
-    atom_instance = Atom(llm_model=get_default_model(), embeddings_model=get_default_embedding_model())
+    atom_instance = Atom(llm_model=get_default_model_no_reasoning(), embeddings_model=get_default_embedding_model())
     
     logger.info("Starting COVID-19 batch processing...")
     logger.info(f"Total dates in dataset: {len(atomic_facts_with_obs_timestamps)}")
@@ -597,7 +597,7 @@ if __name__ == "__main__":
     print(f"  REL_THRESHOLD: {REL_THRESHOLD}")
     print(f"  MAX_WORKERS: {MAX_WORKERS}")
     print(f"  DATA_FILE: {DATA_FILE_PATH}")
-    print(f"  LLM Model: {get_default_model().model_name}")
+    print(f"  LLM Model: {get_default_model_no_reasoning().model_name}")
     print(f"  Embeddings Model: {get_default_embedding_model().model}")
     print("="*50)
     

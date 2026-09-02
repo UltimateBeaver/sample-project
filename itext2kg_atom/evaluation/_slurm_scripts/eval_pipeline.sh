@@ -140,6 +140,9 @@ echo "--- Running Stability Tests ---"
 python ./stability/calculate_stability.py --force-extraction -p $MODEL_POSTFIX
 python ./stability/calculate_stability_jaccard.py -p $MODEL_POSTFIX
 
+echo "--- Running Unsupervised Ragas Tests ---"
+python ./unsupervised/eval_ragas.py -p $MODEL_POSTFIX
+
 # =========================================================================
 # 4. Graceful Cleanup of Background Services
 # =========================================================================

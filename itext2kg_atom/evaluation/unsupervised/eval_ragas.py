@@ -18,17 +18,18 @@ from ragas import evaluate
 from ragas.metrics import Faithfulness, AspectCritic
 from ragas.dataset_schema import SingleTurnSample, EvaluationDataset
 from ragas.llms import LangchainLLMWrapper
+from ragas.run_config import RunConfig
 
 from itext2kg.atom.models.prompts import Prompt
 from document_parser.parser_prompt import ParserPrompt
 
 from models.models import get_default_model, get_default_embedding_model
 from env_config import (
-    eval_output_dataset_path, eval_input_knowledge_graph_path, num_rows_to_process, enable_translation,
+    eval_output_dataset_path, eval_input_knowledge_graph_path, eval_output_results_path, num_rows_to_process, enable_translation,
     column_name_date, column_name_paragraph, column_name_translated_paragraph,
     column_name_translated_sentiment,
     column_name_factoids_extracted, column_name_quintuples_extracted_from_raw_text, column_name_quintuples_extracted,
-    eval_model_postfixes_list
+    eval_model_postfixes_list, llamacpp_num_parallel_slots
 )
 
 # Add the project root to Python path
@@ -38,6 +39,8 @@ sys.path.append(str(project_root))
 
 DATASET: pd.DataFrame = None
 ragas_llm = LangchainLLMWrapper(get_default_model())
+OUTPUT_FILE_PATH = project_root / eval_output_results_path / "ragas"
+Path(OUTPUT_FILE_PATH).mkdir(parents=True, exist_ok=True)
 
 
 # Configure logging
@@ -49,6 +52,14 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Configure ragas.io
+run_config = RunConfig(
+    timeout=600,                                # generous per-job ceiling, incl. queueing + cold-clock ramp-up
+    max_workers=llamacpp_num_parallel_slots,    # never submit more concurrent jobs than the server can serve
+    max_retries=3,
+    max_wait=60,
+)
 
 print("🚀 Starting ragas evaluation script...")
 logger.info("Setting up API connections...")
@@ -206,6 +217,7 @@ def evaluate_step1(
         dataset=EvaluationDataset(samples),
         metrics=[step1_faithfulness, exhaustivity, atomicity],
         llm=ragas_llm,
+        run_config=run_config,
     )
  
  
@@ -249,6 +261,7 @@ def evaluate_step2(
         dataset=EvaluationDataset(samples),
         metrics=[step2_faithfulness, temporal_soundness, predicate_quality],
         llm=ragas_llm,
+        run_config=run_config,
     )
 
 # ── Cross-step : end-to-end grounding ─────────────────────────────────────────
@@ -295,12 +308,14 @@ def evaluate_e2e_grounding(
             dataset=EvaluationDataset(samples_raw),
             metrics=[Faithfulness()],
             llm=ragas_llm,
+            run_config=run_config,
         )
     if samples_two_step:
         results["e2e_two_step"] = evaluate(
             dataset=EvaluationDataset(samples_two_step),
             metrics=[Faithfulness()],
             llm=ragas_llm,
+            run_config=run_config,
         )
     return results
 
@@ -340,6 +355,7 @@ def evaluate_translation(
         dataset=EvaluationDataset(samples),
         metrics=[translation_fidelity, sentiment_alignment],
         llm=ragas_llm,
+        run_config=run_config,
     )
 
 # ── Entity merge evaluation ───────────────────────────────────────────────────
@@ -390,9 +406,33 @@ def evaluate_merge_decisions(merged_pairs: list[dict]):
         dataset=EvaluationDataset(samples),
         metrics=[merge_correctness],
         llm=ragas_llm,
+        run_config=run_config,
     )
 
-# To check from here and below
+def save_results(results_dict: dict, output_dir: str, postfix: str = ""):
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    for name, result in results_dict.items():
+        if result is None:
+            continue
+        out_path = Path(output_dir) / f"{name}{postfix}.json"
+        df = result.to_pandas()
+        df.to_json(out_path, orient="records", indent=2)
+        # Log mean scores for a quick sanity-check in the terminal
+        numeric_cols = df.select_dtypes("number").columns.tolist()
+        summary = {c: round(float(df[c].mean()), 4) for c in numeric_cols}
+        logger.info(f"  {name:30s} → {summary}  (saved to {out_path.name})")
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Unsupervised Ragas evaluation of the ATOM pipeline')
+    parser.add_argument('--model-postfix', '-p', type=str, required=False,
+                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
+    parser.add_argument('--dataset', '-d', type=str, required=False,
+                       help=f"The dataset, in pkl format, used to perform the unsupervised evaluation. If not specified, the default one will be used: ${eval_output_dataset_path}")
+    parser.add_argument("--skip-e2e",         action="store_true", help="Skip end-to-end grounding comparison.")
+    parser.add_argument("--skip-translation",  action="store_true", help="Skip translation evaluation.")
+    parser.add_argument("--skip-merge",        action="store_true", help="Skip entity merge evaluation.")
+    return parser.parse_args()
 
 
 
@@ -437,7 +477,8 @@ def evaluate_atom_pipeline(raw_text: str, atomic_facts: str, quintuples: str):
     results = evaluate(
         dataset=dataset,
         metrics=[Faithfulness(), exhaustivity, temporal_quality],
-        llm=ragas_llm
+        llm=ragas_llm,
+        run_config=run_config,
     )
     
     return results
@@ -452,49 +493,17 @@ def evaluate_merges(entity_a: str, entity_b: str, context: str):
     return evaluate(
         dataset=EvaluationDataset([merge_sample]),
         metrics=[merge_validity],
-        llm=ragas_llm
+        llm=ragas_llm,
+        run_config=run_config,
     )
 """
-# (Only for non english datasets) Evaluate paragraph translation
-def evaluate_english_translations():
-    if column_name_translated_paragraph not in DATASET.columns:
-        return
-    # TODO
-
-# (Only for non english datasets) Evaluate sentiment translation
-def evaluate_sentiment_translations():
-    if column_name_translated_sentiment not in DATASET.columns:
-        return
-    # TODO
-
-def save_results(results_dict: dict, output_dir: str, postfix: str = ""):
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    for name, result in results_dict.items():
-        if result is None:
-            continue
-        out_path = Path(output_dir) / f"{name}{postfix}.json"
-        df = result.to_pandas()
-        df.to_json(out_path, orient="records", indent=2)
-        # Log mean scores for a quick sanity-check in the terminal
-        numeric_cols = df.select_dtypes("number").columns.tolist()
-        summary = {c: round(float(df[c].mean()), 4) for c in numeric_cols}
-        logger.info(f"  {name:30s} → {summary}  (saved to {out_path.name})")
-
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Unsupervised Ragas evaluation of the ATOM pipeline')
-    parser.add_argument('--model-postfix', '-p', type=str, required=False,
-                       help='The postfix representing the backend and model you are executing the test. You can define all supported postfixes inside your .env file, through $EVAL_MODEL_POSTFIXES_LIST variable')
-    parser.add_argument('--dataset', '-d', type=str, required=False,
-                       help=f"The dataset, in pkl format, used to perform the unsupervised evaluation. If not specified, the default one will be used: ${eval_output_dataset_path}")
-    return parser.parse_args()
 
 def main():
     start_time = time.time()
     
     # Parse command line arguments
     args = parse_arguments()
-    model_postfix = args.model_postfix if args.model_postfix else ""
+    model_postfix = args.model_postfix
 
     if model_postfix and model_postfix not in eval_model_postfixes_list:
         logger.error(f'Unsupported --model-postfix arg. Supported ones are: {eval_model_postfixes_list}')
@@ -524,14 +533,63 @@ def main():
         if COL_ENGLISH_PARAGRAPH not in DATASET.columns:
             raise ValueError(f"Missing dataset column {COL_ENGLISH_PARAGRAPH}")
                     
+        all_results: dict = {}
 
-        # ATOM pipeline evaluation
-        for row in DATASET:
-            evaluate_atom_pipeline(row[COL_ENGLISH_PARAGRAPH], row[COL_FACTOIDS_EXTRACTED], row[COL_QUINTUPLES_EXTRACTED])
+        all_results["step1_atomic_facts"] = evaluate_step1(
+            DATASET, COL_ENGLISH_PARAGRAPH, COL_FACTOIDS_EXTRACTED, COL_DATE
+        )
+        all_results["step2_quintuples"] = evaluate_step2(
+            DATASET, COL_FACTOIDS_EXTRACTED, COL_QUINTUPLES_EXTRACTED, COL_DATE
+        )
+        # ── Cross-step grounding ─────────────────────────────────────────────
+        if (
+            not args.skip_e2e
+            and COL_QUINTUPLES_RAW_TEXT_EXTRACTED in DATASET.columns
+        ):
+            e2e = evaluate_e2e_grounding(
+                DATASET,
+                COL_ENGLISH_PARAGRAPH,
+                COL_QUINTUPLES_RAW_TEXT_EXTRACTED,
+                COL_QUINTUPLES_EXTRACTED,
+            )
+            all_results.update(e2e)
+        elif not args.skip_e2e:
+            logger.warning(
+                f"Column {COL_QUINTUPLES_RAW_TEXT_EXTRACTED!r} not found; "
+                "skipping end-to-end comparison."
+            )
+        # ── Translation ──────────────────────────────────────────────────────
+        if enable_translation and not args.skip_translation:
+            if column_name_translated_paragraph in DATASET.columns:
+                all_results["translation"] = evaluate_translation(
+                    DATASET, column_name_paragraph, column_name_translated_paragraph
+                )
+            else:
+                logger.warning(
+                    f"Translation enabled but column {column_name_translated_paragraph!r} "
+                    "not found; skipping."
+                )
+        # ── Entity merge ─────────────────────────────────────────────────────
+        # Populate merged_pairs from your exported KG.  Example stub:
+        #
+        #   import pickle
+        #   kg = pickle.load(open(eval_input_knowledge_graph_path, "rb"))
+        #   merged_pairs = [
+        #       {"entity_a": a, "entity_b": b, "context": ctx}
+        #       for a, b, ctx in kg.get_merged_pairs()   # adapt to your KG API
+        #   ]
+        #
+        # If you don't have a merge-pair extractor yet, pass --skip-merge.
+        if not args.skip_merge:
+            merged_pairs: list[dict] = []   # ← replace with your KG loader
+            if merged_pairs:
+                all_results["entity_merge"] = evaluate_merge_decisions(merged_pairs)
+            else:
+                logger.info("  No merged_pairs provided; skipping merge evaluation (use --skip-merge to suppress this).")
 
-        if enable_translation:
-            evaluate_english_translations()
-            evaluate_sentiment_translations()
+        logger.info("Saving results …")
+        save_results(all_results, OUTPUT_FILE_PATH, postfix=f"_{model_postfix}")
+
 
     except Exception as e:
         logger.error(f"❌ Error occurred: {str(e)}")
@@ -539,7 +597,7 @@ def main():
     finally:
         elapsed_time = time.time() - start_time
         logger.info(f"Processing completed successfully in {elapsed_time:.2f} seconds")
-        print(f"Factoid extraction completed successfully in {elapsed_time:.2f} seconds")
+        print(f"Processing completed successfully in {elapsed_time:.2f} seconds")
 
 if __name__ == "__main__":
     main()
