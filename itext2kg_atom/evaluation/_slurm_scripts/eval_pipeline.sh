@@ -123,6 +123,7 @@ python ./exhaustivity/quintuples_extraction_nyt_from_factoids.py -p $MODEL_POSTF
 # Print out results (json, png, PDF)
 python ./exhaustivity/plot_exhaustivity_factoids.py --force-recalculate
 python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
+python ./exhaustivity/plot_combined_exhaustivity.py
 
 echo "--- Running Latency Tests ---"
 python ./latency/test_graphiti.py

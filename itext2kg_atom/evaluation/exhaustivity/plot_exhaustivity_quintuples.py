@@ -709,16 +709,16 @@ def create_publication_exhaustivity_plot(results, model_names=None):
     ax.set_ylabel('Exhaustivity', fontsize=FONT_SIZES['axis_labels'], fontweight='bold')
     ax.set_title('Exhaustivity of quintuples', fontsize=FONT_SIZES['title'], fontweight='bold', pad=20)
     
-    # Set y-axis range [0, 0.6] as requested
-    ax.set_ylim(0, 0.6)
+    # Set y-axis range [0, 1.0]
+    ax.set_ylim(0, 1.0)
     
     # Add horizontal gridlines at specified intervals (improved visibility)
-    gridlines = [0.1, 0.2, 0.3, 0.4, 0.5]
+    gridlines = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     for gridline in gridlines:
         ax.axhline(y=gridline, color='gray', linestyle='-', alpha=0.4, linewidth=0.6, zorder=1)
     
     # Add minor tick marks on y-axis
-    ax.set_yticks([0.05, 0.15, 0.25, 0.35, 0.45, 0.55], minor=True)
+    ax.set_yticks([0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95], minor=True)
     ax.tick_params(axis='y', which='minor', length=3, width=0.5)
     
     # Set x-axis with improved readability

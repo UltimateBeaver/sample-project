@@ -113,6 +113,7 @@ Once you are done, you can plot the results through:
 ```bash
 python ./exhaustivity/plot_exhaustivity_factoids.py --force-recalculate
 python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
+python ./exhaustivity/plot_combined_exhaustivity.py
 ```
 
 | Output metric name         | Formula         | Description                                                                                                                                                                                                                                                         |

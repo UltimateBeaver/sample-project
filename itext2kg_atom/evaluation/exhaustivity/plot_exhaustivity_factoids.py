@@ -71,7 +71,7 @@ GOLD_COL = column_name_factoids_ground_truth
 TOKEN_COL = column_name_factoids_prompt_tokenc
 
 # Analysis parameters
-SIMILARITY_THRESHOLD = 0.7
+SIMILARITY_THRESHOLD = 0.5
 MAX_SAMPLES = None  # Set to None for all samples, or integer for limit
 
 # Output configuration - specific to factoids
@@ -882,7 +882,7 @@ def create_publication_exhaustivity_plot(results, model_names=None):
     ax.set_ylabel('Exhaustivity', fontsize=FONT_SIZES['axis_labels'], fontweight='bold')
     ax.set_title('Exhaustivity of atomic facts', fontsize=FONT_SIZES['title'], fontweight='bold', pad=20)
     
-    # Set y-axis range [0, 0.6] as requested
+    # Set y-axis range [0, 1.0]
     ax.set_ylim(0, 1.0)
     
     # Add horizontal gridlines at specified intervals (improved visibility)

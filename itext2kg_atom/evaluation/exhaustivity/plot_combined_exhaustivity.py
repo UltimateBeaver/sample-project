@@ -127,7 +127,7 @@ def load_results_from_json(json_path):
         return None
 
 
-def prepare_plot_data(results):
+def prepare_plot_data(results, max_bins=10):
     """
     Prepare data for plotting from results.
     
@@ -152,17 +152,45 @@ def prepare_plot_data(results):
         return None
     
     df_plot = pd.DataFrame(plot_data)
+
+    min_tc, max_tc = df_plot['token_count'].min(), df_plot['token_count'].max()
+    num_unique = df_plot['token_count'].nunique()
+
+    def format_val(val):
+        return f"{val/1000:.1f}k" if val >= 1000 else f"{int(round(val))}"
+
+    if num_unique <= 1 or min_tc == max_tc:
+        bin_label = format_val(min_tc)
+        df_plot['token_bins'] = bin_label
+        unique_bins = [bin_label]
+    else:
+        num_bins = min(max_bins, num_unique)
+        edges = np.linspace(min_tc, max_tc, num_bins + 1)
+        edges[0] -= 1
+        edges[-1] += 1
+        labels = []
+        for i in range(num_bins):
+            start = min_tc + i * (max_tc - min_tc) / num_bins
+            end   = min_tc + (i + 1) * (max_tc - min_tc) / num_bins
+            s_str, e_str = format_val(start), format_val(end)
+            labels.append(f"{s_str}-{e_str}" if s_str != e_str else s_str)
+        df_plot['token_bins'] = pd.cut(df_plot['token_count'], bins=edges,
+                                       labels=labels, ordered=False)
+        unique_bins = list(dict.fromkeys(labels))
     
     # Group by token count and calculate means
-    grouped = df_plot.groupby(['token_count', 'model']).agg({
+    grouped = df_plot.groupby(['token_bins', 'model'], observed=True).agg({
         'recall': 'mean',
         'recall_t': 'mean'
     }).reset_index()
-    
-    return grouped
+
+    bins_in_data = set(grouped['token_bins'].astype(str))
+    unique_bins = [b for b in unique_bins if b in bins_in_data]
+
+    return grouped, unique_bins
 
 
-def plot_subplot_bars(ax, grouped, model_names, title_text, y_label=r"$R_{\text{MATCH}}$ and $R_{\text{MATCH}_t}$"):
+def plot_subplot_bars(ax, grouped, unique_bins, model_names, title_text, y_label=r"$R_{\text{MATCH}}$ and $R_{\text{MATCH}_t}$"):
     """
     Plot bars for a single subplot.
     
@@ -177,13 +205,15 @@ def plot_subplot_bars(ax, grouped, model_names, title_text, y_label=r"$R_{\text{
         List of legend elements
     """
     # Get unique token counts and reduce density for publication
-    unique_tokens = sorted(grouped['token_count'].unique())
-    unique_tokens_reduced = unique_tokens [::2] # Show every 4th token count for less crowding
+    # unique_tokens = sorted(grouped['token_count'].unique())
+    # unique_tokens_reduced = unique_tokens [::2] # Show every 4th token count for less crowding
     
+    # n_models = len([m for m in model_names if m in grouped['model'].values])
+    
+    # # Set up bar positions
+    # x = np.arange(len(unique_tokens_reduced))
     n_models = len([m for m in model_names if m in grouped['model'].values])
-    
-    # Set up bar positions
-    x = np.arange(len(unique_tokens_reduced))
+    x = np.arange(len(unique_bins))
     width = 0.12  # Bar width
     
     # Plot bars for each model
@@ -197,8 +227,8 @@ def plot_subplot_bars(ax, grouped, model_names, title_text, y_label=r"$R_{\text{
         recalls = []
         recalls_t = []
         
-        for token_count in unique_tokens_reduced:
-            token_data = model_data[model_data['token_count'] == token_count]
+        for bin_name in unique_bins:
+            token_data = model_data[model_data['token_bins'] == bin_name]
             if len(token_data) > 0:
                 recalls.append(token_data['recall'].iloc[0])
                 recalls_t.append(token_data['recall_t'].iloc[0])
@@ -257,11 +287,9 @@ def plot_subplot_bars(ax, grouped, model_names, title_text, y_label=r"$R_{\text{
         else:
             return f'{int(tc)}'
     
-    ax.set_xticklabels([format_token_count(tc) for tc in unique_tokens_reduced], 
-                       rotation=35, ha='right', fontsize=FONT_SIZES['tick_labels'])  # Less aggressive rotation
-    
-    # Extend x-axis limits to use full plot width
-    ax.set_xlim(-0.5, len(unique_tokens_reduced) - 0.5)
+    ax.set_xticklabels(unique_bins,
+                   rotation=35, ha='right', fontsize=FONT_SIZES['tick_labels'])
+    ax.set_xlim(-0.5, len(unique_bins) - 0.5)
     
     # Add black borders around subplot (1.5-2pt stroke)
     for spine in ax.spines.values():
@@ -311,26 +339,26 @@ def create_combined_exhaustivity_plot(factoids_results, quintuples_results):
     })
     
     # Prepare data for both plots
-    factoids_grouped = prepare_plot_data(factoids_results)
-    quintuples_grouped = prepare_plot_data(quintuples_results)
+    factoids_grouped, factoids_bins = prepare_plot_data(factoids_results)
+    quintuples_grouped, quintuples_bins = prepare_plot_data(quintuples_results)
     
     if factoids_grouped is None or quintuples_grouped is None:
         logger.error("Failed to prepare plot data")
         return None, None
     
     # Create figure with two subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(FIGURE_WIDTH, FIGURE_HEIGHT), dpi=DPI)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(FIGURE_WIDTH, FIGURE_HEIGHT * 1.5 + 0.6), dpi=DPI)
     
     # Plot factoids (top subplot)
     legend_elements_factoids = plot_subplot_bars(
-        ax1, factoids_grouped, PUBLICATION_MODELS, 
+        ax1, factoids_grouped, factoids_bins, PUBLICATION_MODELS, 
         "(a) Exhaustivity of atomic facts decomposition"
     )
     
     # Plot quintuples (bottom subplot)
     legend_elements_quintuples = plot_subplot_bars(
-        ax2, quintuples_grouped, PUBLICATION_MODELS, 
-        "(b) Exhaustivity of 5-tuples extraction"
+        ax2, quintuples_grouped, quintuples_bins, PUBLICATION_MODELS, 
+        "(b) Exhaustivity of 5-tuples extraction",
     )
     
     # Create custom legend with models (filled) + factual/temporal symbols
@@ -346,7 +374,7 @@ def create_combined_exhaustivity_plot(factoids_results, quintuples_results):
     # TODO
     
     # Add model entries with filled colored rectangles
-    for model_key in zip(PUBLICATION_MODELS):
+    for model_key in PUBLICATION_MODELS:
         color = COLORS.get(model_key, '#666666')
         
         # Create filled rectangle for each model
