@@ -9,6 +9,10 @@
 #SBATCH --partition=gpu_a40           # GPU partition on the cluster
 #SBATCH --output=logs/eval_pipeline_stdout.log    # Standard output log file
 #SBATCH --error=logs/eval_pipeline_stderr.log     # Standard error log file
+#SBATCH --unbuffered
+
+# Force Bash and Python to flush output streams to disk immediately so log files are never empty
+export PYTHONUNBUFFERED=1
 
 # =========================================================================
 # 1. Environment & Path Initialization
@@ -17,6 +21,11 @@ module purge
 module load miniconda3/3.13.25
 module load gcc/12.4.0
 module load nvhpc/25.1
+
+echo "Killing lingering infrastructure processes from previous runs..."
+pkill -u $(whoami) -f llama-server || true
+pkill -u $(whoami) -f neo4j || true
+sleep 3
 
 # Use the cluster's NVHPC path to inject CUDA runtime and math libraries
 if [ -n "$NVHPC_ROOT" ]; then
@@ -134,7 +143,18 @@ sleep 15
 # ------------------------
 
 echo "--- Running Latency Tests ---"
-#python ./latency/test_graphiti.py
+# To remove the whole cache execute:
+# rm -rf $HOME/thesis-project/sample-project/itext2kg_atom/datasets/atom/my_test_datasets/cache
+# rm -rf $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/datasets/atom/my_test_datasets/cache
+python ./latency/test_graphiti.py
+
+# --- llama.cpp reboot ---
+pkill llama-server
+sleep 5
+./start-llama-servers.sh
+sleep 15
+# ------------------------
+
 python ./latency/testing_atom.py
 python ./latency/testing_itext2kg.py
 python ./latency/plot_latency_comparison.py
