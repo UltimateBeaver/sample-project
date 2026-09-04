@@ -16,6 +16,7 @@ mkdir -p "$LOG_DIR"
 # Submit jobs, overriding their default #SBATCH values
 # We also use --export to pass the MODEL_POSTFIX to the compute node environment
 sbatch \
+  --exclude=compute-4-13 \
   --nodes="$NODES" \
   --ntasks="$NTASKS" \
   --cpus-per-task="$CPUS_PER_TASK" \

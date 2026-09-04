@@ -7,6 +7,8 @@
 #SBATCH --gres=gpu:2                  # Request 2 GPU (Required for Gemma 4)
 #SBATCH --time=0-23:59:00             # Max runtime (Hours: 24 hours)
 #SBATCH --partition=gpu_a40           # GPU partition on the cluster
+#SBATCH --output=logs/eval_pipeline_stdout.log    # Standard output log file
+#SBATCH --error=logs/eval_pipeline_stderr.log     # Standard error log file
 # Note: --output and --error are now handled dynamically by start_eval_pipeline_wrapper.sh
 
 # =========================================================================

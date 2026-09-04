@@ -180,6 +180,11 @@ In this guide there will be several steps in which you are required to copy-past
         hf download unsloth/gemma-4-E4B-it-GGUF gemma-4-E4B-it-Q4_K_M.gguf --local-dir ~/thesis-project/models
         hf download nomic-ai/nomic-embed-text-v2-moe-GGUF nomic-embed-text-v2-moe.Q8_0.gguf --local-dir ~/thesis-project/models/embeddings
 
+        # Other models downloaded for comparison
+        hf download unsloth/Llama-4-Scout-17B-16E-Instruct-GGUF --include "*Q4_K_M*.gguf" --local-dir ~/thesis-project/models
+        hf download DevQuasar/Qwen.Qwen3.8-27B-GGUF --include "*Q4_K_M*.gguf" --local-dir ~/thesis-project/models
+        hf download bartowski/Phi-3.5-mini-instruct-GGUF --include "*Q4_K_M*.gguf" --local-dir ~/thesis-project/models
+
         # Close SLURM session
         squeue -u $(whoami) -h -o "%A" | xargs -I {} scancel {}
         ```
