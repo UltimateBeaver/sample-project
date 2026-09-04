@@ -88,7 +88,8 @@ $CONTAINER_EXEC run --writable-tmpfs \
 NEO4J_PID=$!
 
 echo "Launching llama.cpp Model and Embedding Servers..."
-chmod +x start-llama-servers.sh
+chmod +x $HOME/thesis-project/sample-project/start-llama-servers.sh
+chmod +x $SCRATCH_FLASH/thesis-project/sample-project/start-llama-servers.sh
 ./start-llama-servers.sh
 
 # Give the background engines enough time to load the GGUF models into VRAM
@@ -125,17 +126,38 @@ python ./exhaustivity/plot_exhaustivity_factoids.py --force-recalculate
 python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 python ./exhaustivity/plot_combined_exhaustivity.py
 
+# --- llama.cpp reboot ---
+pkill llama-server
+sleep 5
+./start-llama-servers.sh
+sleep 15
+# ------------------------
+
 echo "--- Running Latency Tests ---"
-python ./latency/test_graphiti.py
+#python ./latency/test_graphiti.py
 python ./latency/testing_atom.py
 python ./latency/testing_itext2kg.py
 python ./latency/plot_latency_comparison.py
+
+# --- llama.cpp reboot ---
+pkill llama-server
+sleep 5
+./start-llama-servers.sh
+sleep 15
+# ------------------------
 
 echo "--- Running Merge Tests ---"
 python ./merge/evaluate_atom_merge.py -p $MODEL_POSTFIX
 
 echo "--- Running Quintuples Quality Tests ---"
 python ./quintuples_quality/calculate_quintuples_quality.py -p $MODEL_POSTFIX
+
+# --- llama.cpp reboot ---
+pkill llama-server
+sleep 5
+./start-llama-servers.sh
+sleep 15
+# ------------------------
 
 echo "--- Running Stability Tests ---"
 python ./stability/calculate_stability.py --force-extraction -p $MODEL_POSTFIX

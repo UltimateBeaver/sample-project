@@ -71,7 +71,7 @@ GOLD_COL = column_name_factoids_ground_truth
 TOKEN_COL = column_name_factoids_prompt_tokenc
 
 # Analysis parameters
-SIMILARITY_THRESHOLD = 0.5
+SIMILARITY_THRESHOLD = 0.7
 MAX_SAMPLES = None  # Set to None for all samples, or integer for limit
 
 # Output configuration - specific to factoids
