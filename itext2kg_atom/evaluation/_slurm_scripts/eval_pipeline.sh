@@ -217,7 +217,7 @@ rsync -av \
 
 # The previous command avoids to copy the whole logs of llama.cpp server as they are huge
 # So here I'm just copying the last 1000 lines of both
-tail -n 1000 $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs/eval_pipeline_stdout.log > $HOME/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs/eval_pipeline_stdout.log
-tail -n 1000 $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs/eval_pipeline_stderr.log > $HOME/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs/eval_pipeline_stderr.log
+# tail -n 1000 $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs/eval_pipeline_stdout.log > $HOME/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs/eval_pipeline_stdout.log
+# tail -n 1000 $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs/eval_pipeline_stderr.log > $HOME/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs/eval_pipeline_stderr.log
 
 echo "Job completed successfully!"
