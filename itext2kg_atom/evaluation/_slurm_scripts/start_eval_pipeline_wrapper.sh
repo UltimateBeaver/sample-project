@@ -9,8 +9,9 @@ else
 fi
 
 # Define and create absolute log directory in $HOME
-LOG_DIR="$HOME/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs"
+LOG_DIR="$SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs"
 mkdir -p "$LOG_DIR"
+mkdir -p "$HOME/thesis-project/sample-project/itext2kg_atom/evaluation/_slurm_scripts/logs"
 
 # Submit jobs, overriding their default #SBATCH values
 # We also use --export to pass the MODEL_POSTFIX to the compute node environment
