@@ -12,6 +12,7 @@ LLAMA_SERVER_EXEC=${LLAMACPP_SERVER_BIN:-llama-server}
 # 2. Start the servers in the background
 # We use nohup to ensure the processes don't die if you close the terminal
 echo "Starting Model Server using: $LLAMA_SERVER_EXEC"
+mkdir -p $HOME/thesis-project/sample-project/logs
 #nohup "$LLAMA_SERVER_EXEC" -m "$LLAMACPP_PATH_MODEL" -c "$LLAMACPP_MODEL_CONTEXT_SIZE" -ngl "$LLAMACPP_MODEL_NGL" -fa on --port "$LLAMA_CPP_MODEL_PORT" -np "$LLAMACPP_MODEL_NUM_PARALLEL_SLOTS" --no-mmap --reasoning "$LLAMACPP_MODEL_REASONING" --chat-template-kwargs "{\"enable_thinking\": ${LLAMACPP_MODEL_THINKING:-false}}" > $HOME/thesis-project/sample-project/logs/model.log 2>&1 &
 nohup "$LLAMA_SERVER_EXEC" -m "$LLAMACPP_PATH_MODEL" -c "$LLAMACPP_MODEL_CONTEXT_SIZE" -ngl "$LLAMACPP_MODEL_NGL" -fa on --port "$LLAMA_CPP_MODEL_PORT" -np "$LLAMACPP_MODEL_NUM_PARALLEL_SLOTS" > $HOME/thesis-project/sample-project/logs/model.log 2>&1 &
 
