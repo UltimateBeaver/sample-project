@@ -128,7 +128,9 @@ async def main():
     # Build the knowledge graph across different observation timestamps
     kg = await atom.build_graph_from_different_obs_times(
         atomic_facts_with_obs_timestamps=news_covid_dict,
-        existing_knowledge_graph=existing_kg
+        existing_knowledge_graph=existing_kg,
+        ent_threshold=similarity_threshold_entity,
+        rel_threshold=similarity_threshold_relationship
     )
 
     # Update the resulting knowledge graph in Neo4j

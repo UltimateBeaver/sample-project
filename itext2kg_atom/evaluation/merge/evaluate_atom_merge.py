@@ -21,7 +21,8 @@ import asyncio
 from models.models import get_default_embedding_model
 from env_config import (
     eval_output_dataset_path, eval_input_knowledge_graph_path, eval_cache_path, num_rows_to_process,
-    column_name_quintuples_extracted, eval_model_postfixes_list
+    column_name_quintuples_extracted, eval_model_postfixes_list,
+    similarity_threshold_eval_merge
 )
 
 # Add the project root to Python path (same pattern as other scripts)
@@ -41,7 +42,7 @@ DF_NYT_PATH = project_root / eval_output_dataset_path
 COL_NAME_QUINTUPLES = "will be overwritten in main"
 
 # Similarity threshold for determining duplicates
-THRESHOLD = 0.8
+THRESHOLD = similarity_threshold_eval_merge
 
 # Cache file for ground truth entity embeddings
 ENTITY_EMBEDDINGS_CACHE = f"{project_root}/{eval_cache_path}/cache_atom/entity_embeddings_ground_truth_atom.pkl"

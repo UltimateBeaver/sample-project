@@ -34,7 +34,8 @@ from itext2kg_atom.evaluation.exhaustivity.quintuples_extraction_nyt import extr
 from models.models import get_default_model_no_reasoning, get_default_embedding_model
 from env_config import (
     column_name_quintuples_extracted, column_name_quintuples_extracted_from_raw_text,
-    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list
+    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list,
+    similarity_threshold_eval_quintuple
 )
 
 # Add the project root to Python path (same pattern as other scripts)
@@ -79,7 +80,7 @@ STABILITY_COMPARISONS = [
 ]
 
 # Analysis parameters
-SIMILARITY_THRESHOLD = 0.7  # Same as in plot_exhaustivity_quintuples.py
+SIMILARITY_THRESHOLD = similarity_threshold_eval_quintuple  # Same as in plot_exhaustivity_quintuples.py
 MAX_SAMPLES = None  # Set to None for all samples, or integer for limit
 
 # Output configuration

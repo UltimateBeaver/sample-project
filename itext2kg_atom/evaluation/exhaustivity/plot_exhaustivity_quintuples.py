@@ -31,7 +31,8 @@ from pathlib import Path
 from models.models import get_default_model, get_default_embedding_model
 from env_config import (
     column_name_quintuples_ground_truth, column_name_quintuples_extracted, column_name_quintuples_prompt_tokenc,
-    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list, eval_model_postfixes_to_plot_list
+    eval_output_dataset_path, eval_output_results_path, eval_model_postfixes_list, eval_model_postfixes_to_plot_list,
+    similarity_threshold_eval_quintuple
 )
 
 # Add the project root to Python path (same pattern as exhaustivity_evaluation_nyt.py)
@@ -66,7 +67,7 @@ GOLD_COL = column_name_quintuples_ground_truth
 TOKEN_COL = column_name_quintuples_prompt_tokenc
 
 # Analysis parameters
-SIMILARITY_THRESHOLD = 0.7
+SIMILARITY_THRESHOLD = similarity_threshold_eval_quintuple
 MAX_SAMPLES = None  # Set to None for all samples, or integer for limit
 
 # Output configuration

@@ -139,32 +139,32 @@ sleep 5
 sleep 15
 # ------------------------
 
-echo "--- Running Latency Tests ---"
-# To remove the whole cache execute:
-# rm -rf $HOME/thesis-project/sample-project/itext2kg_atom/datasets/atom/my_test_datasets/cache
-# rm -rf $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/datasets/atom/my_test_datasets/cache
-python ./latency/test_graphiti.py
+# echo "--- Running Latency Tests ---"
+# # To remove the whole cache execute:
+# # rm -rf $HOME/thesis-project/sample-project/itext2kg_atom/datasets/atom/my_test_datasets/cache
+# # rm -rf $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/datasets/atom/my_test_datasets/cache
+# python ./latency/test_graphiti.py
 
-# --- llama.cpp reboot ---
-pkill llama-server
-sleep 5
-./start-llama-servers.sh
-sleep 15
-# ------------------------
+# # --- llama.cpp reboot ---
+# pkill llama-server
+# sleep 5
+# ./start-llama-servers.sh
+# sleep 15
+# # ------------------------
 
-python ./latency/testing_atom.py
-python ./latency/testing_itext2kg.py
-python ./latency/plot_latency_comparison.py
+# python ./latency/testing_atom.py
+# python ./latency/testing_itext2kg.py
+# python ./latency/plot_latency_comparison.py
 
-# --- llama.cpp reboot ---
-pkill llama-server
-sleep 5
-./start-llama-servers.sh
-sleep 15
-# ------------------------
+# # --- llama.cpp reboot ---
+# pkill llama-server
+# sleep 5
+# ./start-llama-servers.sh
+# sleep 15
+# # ------------------------
 
-echo "--- Running Merge Tests ---"
-python ./merge/evaluate_atom_merge.py -p $MODEL_POSTFIX
+# echo "--- Running Merge Tests ---"
+# python ./merge/evaluate_atom_merge.py -p $MODEL_POSTFIX
 
 echo "--- Running Quintuples Quality Tests ---"
 python ./quintuples_quality/calculate_quintuples_quality.py -p $MODEL_POSTFIX
@@ -179,6 +179,13 @@ sleep 15
 echo "--- Running Stability Tests ---"
 python ./stability/calculate_stability.py --force-extraction -p $MODEL_POSTFIX
 python ./stability/calculate_stability_jaccard.py -p $MODEL_POSTFIX
+
+# --- llama.cpp reboot ---
+pkill llama-server
+sleep 5
+./start-llama-servers.sh
+sleep 15
+# ------------------------
 
 echo "--- Running Unsupervised Ragas Tests ---"
 python ./unsupervised/eval_ragas.py -p $MODEL_POSTFIX

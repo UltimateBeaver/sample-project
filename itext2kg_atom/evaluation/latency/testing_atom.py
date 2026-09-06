@@ -32,7 +32,8 @@ from itext2kg.atom.models import KnowledgeGraph
 from models.models import get_default_model_no_reasoning, get_default_embedding_model
 from env_config import (
     provider_openai_max_elements_per_batch, num_rows_to_process, column_name_date, column_name_factoids_ground_truth,
-    eval_input_dataset_path, eval_cache_path
+    eval_input_dataset_path, eval_cache_path,
+    similarity_threshold_entity, similarity_threshold_relationship
 )
 
 # Add the project root to Python path (same pattern as other scripts)
@@ -47,8 +48,8 @@ logger = logging.getLogger(__name__)
 # Global Parameters - Modify these as needed
 CACHE_DIR = project_root / eval_cache_path / "cache_atom"
 BATCH_SIZE = provider_openai_max_elements_per_batch
-ENT_THRESHOLD = 0.8
-REL_THRESHOLD = 0.7
+ENT_THRESHOLD = similarity_threshold_entity
+REL_THRESHOLD = similarity_threshold_relationship
 ENTITY_NAME_WEIGHT = 0.8
 ENTITY_LABEL_WEIGHT = 0.2
 MAX_WORKERS = 8

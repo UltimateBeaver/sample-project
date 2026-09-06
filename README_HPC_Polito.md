@@ -96,6 +96,19 @@ In this guide there will be several steps in which you are required to copy-past
     NEO4J_URI=bolt://localhost:7687
     NEO4J_USERNAME=neo4j
     NEO4J_PASSWORD=password
+    # ATOM
+    # Used for nomic-embed-text-v2-moe.Q8_0.gguf
+    # SIMILARITY_THRESHOLD_ENTITY=0.8
+    # SIMILARITY_THRESHOLD_RELATIONSHIP=0.7
+    # SIMILARITY_THRESHOLD_EVAL_FACTOID=0.7
+    # SIMILARITY_THRESHOLD_EVAL_QUINTUPLE=0.7
+    # SIMILARITY_THRESHOLD_EVAL_MERGE=0.8
+    # Used for gte-qwen2-1.5b-instruct-q8_0.gguf
+    SIMILARITY_THRESHOLD_ENTITY=0.8
+    SIMILARITY_THRESHOLD_RELATIONSHIP=0.7
+    SIMILARITY_THRESHOLD_EVAL_FACTOID=0.5
+    SIMILARITY_THRESHOLD_EVAL_QUINTUPLE=0.5
+    SIMILARITY_THRESHOLD_EVAL_MERGE=0.8
     # Number of dataset rows to process (for quick testing)
     # Delete this variable or set it to 0 to process all rows
     NUM_ROWS_TO_PROCESS=10

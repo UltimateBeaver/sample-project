@@ -103,6 +103,19 @@ Sample repo for master's degree thesis
     NEO4J_URI=bolt://localhost:7687
     NEO4J_USERNAME=neo4j
     NEO4J_PASSWORD=password
+    # ATOM
+    # Used for nomic-embed-text-v2-moe.Q8_0.gguf
+    # SIMILARITY_THRESHOLD_ENTITY=0.8
+    # SIMILARITY_THRESHOLD_RELATIONSHIP=0.7
+    # SIMILARITY_THRESHOLD_EVAL_FACTOID=0.7
+    # SIMILARITY_THRESHOLD_EVAL_QUINTUPLE=0.7
+    # SIMILARITY_THRESHOLD_EVAL_MERGE=0.8
+    # Used for gte-qwen2-1.5b-instruct-q8_0.gguf
+    SIMILARITY_THRESHOLD_ENTITY=0.8
+    SIMILARITY_THRESHOLD_RELATIONSHIP=0.7
+    SIMILARITY_THRESHOLD_EVAL_FACTOID=0.5
+    SIMILARITY_THRESHOLD_EVAL_QUINTUPLE=0.5
+    SIMILARITY_THRESHOLD_EVAL_MERGE=0.7
     # Number of dataset rows to process (for quick testing)
     # Delete this variable or set it to 0 to process all rows
     NUM_ROWS_TO_PROCESS=10
@@ -202,6 +215,32 @@ venv/Scripts/activate
 # Make sure Neo4j container and Ollama/llama_cpp_servers are running!
 # Finally execute the Graph Utility tool
 python ./utils/kg_utility/graph_utility.py
+```
+
+# SIMILARITY_THRESHOLD calibration
+Since this pipeline uses an embedding model to compute word-embeddings and produce the related cosine similarity matrix, it is crucial to use these script to properly calibrate the `SIMILARITY_THRESHOLD`, which varies depending on the chosen embedding model.
+```bash
+# Move to the python virtual environment (if not already there)
+venv/Scripts/activate
+# Make sure Ollama/llama_cpp_servers containing the embedding model you want to test is running!
+# Finally execute the Theshold calibration tool
+cd ./utils/similarity_threshold_calibration/
+
+# --- Example for nomic and qwen ---
+# Calibration phase 1
+
+# with nomic server running:
+python calibration_phase1_distribution.py --model nomic
+python calibration_phase2_threshold_sweep.py --model nomic --operating-point 0.70
+# swap to qwen, then:
+python calibration_phase1_distribution.py --model qwen
+python calibration_phase2_threshold_sweep.py --model qwen  --operating-point 0.50
+
+# generate comparison plot + table:
+python calibration_phase1_distribution.py --compare
+python calibration_phase2_threshold_sweep.py --compare
+
+# Calibration phase 2
 ```
 
 ---

@@ -17,6 +17,15 @@ neo4j_uri =             os.getenv("NEO4J_URI",          "bolt://localhost:7687")
 neo4j_username =        os.getenv("NEO4J_USERNAME")
 neo4j_password =        os.getenv("NEO4J_PASSWORD")
 
+# ATOM
+# used in main.py pipeline
+similarity_threshold_entity = float(os.getenv("SIMILARITY_THRESHOLD_ENTITY", 0.8))
+similarity_threshold_relationship = float(os.getenv("SIMILARITY_THRESHOLD_RELATIONSHIP", 0.7))
+# used in evaluation pipeline
+similarity_threshold_eval_factoid = float(os.getenv("SIMILARITY_THRESHOLD_EVAL_FACTOID", 0.7))
+similarity_threshold_eval_quintuple = float(os.getenv("SIMILARITY_THRESHOLD_EVAL_QUINTUPLE", 0.7))
+similarity_threshold_eval_merge = float(os.getenv("SIMILARITY_THRESHOLD_EVAL_MERGE", 0.8))
+
 # Langchain output parser configuration
 provider_openai_max_elements_per_batch =    int(os.getenv("PROVIDER_OPENAI_MAX_ELEMENTS_PER_BATCH"))
 provider_openai_max_tokens_per_batch =      int(os.getenv("PROVIDER_OPENAI_MAX_TOKENS_PER_BATCH"))
