@@ -19,6 +19,14 @@ module load miniconda3/3.13.25
 module load gcc/12.4.0
 module load nvhpc/25.1
 
+wait_for_servers() {
+    echo "Waiting for Model Server to be fully loaded..."
+    while [[ "$(curl -s http://localhost:8080/health | grep -o '"status":"ok"')" != '"status":"ok"' ]]; do
+        sleep 5
+    done
+    echo "Model Server is ready!"
+}
+
 echo "Killing lingering infrastructure processes from previous runs..."
 pkill -u $(whoami) -f llama-server || true
 pkill -u $(whoami) -f neo4j || true
@@ -99,8 +107,8 @@ chmod +x $SCRATCH_FLASH/thesis-project/sample-project/start-llama-servers.sh
 ./start-llama-servers.sh
 
 # Give the background engines enough time to load the GGUF models into VRAM
-echo "Waiting 30 seconds for infrastructure to boot completely..."
-sleep 30
+echo "Waiting for infrastructure to boot completely..."
+wait_for_servers
 
 # =========================================================================
 # 3. Run Core Python Evaluation test
@@ -136,7 +144,7 @@ python ./exhaustivity/plot_combined_exhaustivity.py
 pkill llama-server
 sleep 5
 ./start-llama-servers.sh
-sleep 15
+wait_for_servers
 # ------------------------
 
 # echo "--- Running Latency Tests ---"
@@ -149,7 +157,7 @@ sleep 15
 # pkill llama-server
 # sleep 5
 # ./start-llama-servers.sh
-# sleep 15
+# wait_for_servers
 # # ------------------------
 
 # python ./latency/testing_atom.py
@@ -160,7 +168,7 @@ sleep 15
 # pkill llama-server
 # sleep 5
 # ./start-llama-servers.sh
-# sleep 15
+# wait_for_servers
 # # ------------------------
 
 # echo "--- Running Merge Tests ---"
@@ -173,7 +181,7 @@ python ./quintuples_quality/calculate_quintuples_quality.py -p $MODEL_POSTFIX
 pkill llama-server
 sleep 5
 ./start-llama-servers.sh
-sleep 15
+wait_for_servers
 # ------------------------
 
 echo "--- Running Stability Tests ---"
@@ -184,7 +192,7 @@ python ./stability/calculate_stability_jaccard.py -p $MODEL_POSTFIX
 pkill llama-server
 sleep 5
 ./start-llama-servers.sh
-sleep 15
+wait_for_servers
 # ------------------------
 
 echo "--- Running Unsupervised Ragas Tests ---"
