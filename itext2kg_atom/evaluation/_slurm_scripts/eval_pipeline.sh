@@ -27,6 +27,20 @@ wait_for_servers() {
     echo "Model Server is ready!"
 }
 
+servers_reboot() {
+    echo "Rebooting LLM and embedding servers"
+    pkill llama-server
+    sleep 10
+
+    # Temporarily move to the project root to access .env
+    pushd $SCRATCH_FLASH/thesis-project/sample-project > /dev/null
+
+    $SCRATCH_FLASH/thesis-project/sample-project/start-llama-servers.sh
+
+    popd > /dev/null
+    wait_for_servers
+}
+
 echo "Killing lingering infrastructure processes from previous runs..."
 pkill -u $(whoami) -f llama-server || true
 pkill -u $(whoami) -f neo4j || true
@@ -118,9 +132,9 @@ source $SCRATCH_FLASH/thesis-project/sample-project/.env
 
 # Move to the itext2kg_atom root directory
 cd $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom
-echo "Removing previously tests results for starting fresh: $EVAL_OUTPUT_RESULTS_PATH and $EVAL_OUTPUT_DATASET_PATH ..."
+echo "Removing previously tests results for starting fresh: $EVAL_OUTPUT_RESULTS_PATH ..."
 rm -r -f $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/$EVAL_OUTPUT_RESULTS_PATH
-rm -r -f $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/$EVAL_OUTPUT_DATASET_PATH
+#rm -r -f $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/$EVAL_OUTPUT_DATASET_PATH
 
 # Move into the evaluation tests directory
 cd evaluation
@@ -141,11 +155,7 @@ python ./exhaustivity/plot_exhaustivity_quintuples.py --force-recalculate
 python ./exhaustivity/plot_combined_exhaustivity.py
 
 # --- llama.cpp reboot ---
-pkill llama-server
-sleep 5
-./start-llama-servers.sh
-wait_for_servers
-# ------------------------
+servers_reboot
 
 # echo "--- Running Latency Tests ---"
 # # To remove the whole cache execute:
@@ -154,22 +164,14 @@ wait_for_servers
 # python ./latency/test_graphiti.py
 
 # # --- llama.cpp reboot ---
-# pkill llama-server
-# sleep 5
-# ./start-llama-servers.sh
-# wait_for_servers
-# # ------------------------
+# servers_reboot
 
 # python ./latency/testing_atom.py
 # python ./latency/testing_itext2kg.py
 # python ./latency/plot_latency_comparison.py
 
 # # --- llama.cpp reboot ---
-# pkill llama-server
-# sleep 5
-# ./start-llama-servers.sh
-# wait_for_servers
-# # ------------------------
+# servers_reboot
 
 # echo "--- Running Merge Tests ---"
 # python ./merge/evaluate_atom_merge.py -p $MODEL_POSTFIX
@@ -178,22 +180,14 @@ echo "--- Running Quintuples Quality Tests ---"
 python ./quintuples_quality/calculate_quintuples_quality.py -p $MODEL_POSTFIX
 
 # --- llama.cpp reboot ---
-pkill llama-server
-sleep 5
-./start-llama-servers.sh
-wait_for_servers
-# ------------------------
+servers_reboot
 
 echo "--- Running Stability Tests ---"
 python ./stability/calculate_stability.py --force-extraction -p $MODEL_POSTFIX
 python ./stability/calculate_stability_jaccard.py -p $MODEL_POSTFIX
 
 # --- llama.cpp reboot ---
-pkill llama-server
-sleep 5
-./start-llama-servers.sh
-wait_for_servers
-# ------------------------
+servers_reboot
 
 echo "--- Running Unsupervised Ragas Tests ---"
 python ./unsupervised/eval_ragas.py -p $MODEL_POSTFIX
