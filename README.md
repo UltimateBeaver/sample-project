@@ -107,11 +107,11 @@ Sample repo for master's degree thesis
     # Used for nomic-embed-text-v2-moe.Q8_0.gguf
     # SIMILARITY_THRESHOLD_ENTITY=0.8
     # SIMILARITY_THRESHOLD_RELATIONSHIP=0.7
-    # SIMILARITY_THRESHOLD_EVAL_FACTOID=0.7
-    # SIMILARITY_THRESHOLD_EVAL_QUINTUPLE=0.7
+    # SIMILARITY_THRESHOLD_EVAL_FACTOID=0.65
+    # SIMILARITY_THRESHOLD_EVAL_QUINTUPLE=0.65
     # SIMILARITY_THRESHOLD_EVAL_MERGE=0.8
     # Used for gte-qwen2-1.5b-instruct-q8_0.gguf
-    SIMILARITY_THRESHOLD_ENTITY=0.8
+    SIMILARITY_THRESHOLD_ENTITY=0.7
     SIMILARITY_THRESHOLD_RELATIONSHIP=0.7
     SIMILARITY_THRESHOLD_EVAL_FACTOID=0.5
     SIMILARITY_THRESHOLD_EVAL_QUINTUPLE=0.5
@@ -234,7 +234,7 @@ python calibration_phase1_distribution.py --model nomic
 python calibration_phase2_threshold_sweep.py --model nomic --operating-point 0.70
 # swap to qwen, then:
 python calibration_phase1_distribution.py --model qwen
-python calibration_phase2_threshold_sweep.py --model qwen  --operating-point 0.50
+python calibration_phase2_threshold_sweep.py --model qwen  --operating-point 0.70
 
 # generate comparison plot + table:
 python calibration_phase1_distribution.py --compare

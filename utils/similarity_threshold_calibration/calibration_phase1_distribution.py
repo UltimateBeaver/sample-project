@@ -97,7 +97,7 @@ def compute_stats(sims: np.ndarray) -> dict:
         "p50":         float(np.percentile(sims, 50)),
         "p90":         float(np.percentile(sims, 90)),
         "frac_gt_050": float(np.mean(sims > 0.50)),
-        "frac_gt_070": float(np.mean(sims > 0.70)),
+        "frac_gt_065": float(np.mean(sims > 0.65)),
     }
 
 
@@ -138,7 +138,7 @@ def run_compute(model_name: str) -> None:
     st   = compute_stats(sims)
 
     print(f"  mean={st['mean']:.4f}  std={st['std']:.4f}  "
-          f"p90={st['p90']:.4f}  frac>0.70={st['frac_gt_070']:.3f}")
+          f"p90={st['p90']:.4f}  frac>0.65={st['frac_gt_065']:.3f}")
 
     np.save(CALIB_DIR / f"sims_{model_name}.npy", sims)
     (CALIB_DIR / f"stats_{model_name}.json").write_text(json.dumps(st, indent=2))
@@ -152,7 +152,7 @@ def run_compute(model_name: str) -> None:
         ax.plot(xs, gaussian_kde(sims)(xs), color="#1f77b4", linewidth=2)
     except ImportError:
         pass  # scipy optional; histogram alone is sufficient
-    ax.axvline(0.70, color="red",    linestyle="--", linewidth=1.3, label="τ = 0.70")
+    ax.axvline(0.65, color="red",    linestyle="--", linewidth=1.3, label="τ = 0.65")
     ax.axvline(0.50, color="orange", linestyle="--", linewidth=1.3, label="τ = 0.50")
     ax.set_xlabel("Cosine similarity"); ax.set_ylabel("Density")
     ax.set_title(f"Pairwise similarity distribution – {model_name}")
@@ -189,8 +189,8 @@ def run_compare(model_a: str, model_b: str) -> None:
             ax.hist(sims, bins=60, density=True, alpha=0.5, color=col,
                     edgecolor="none", label=name)
 
-    ax.axvline(0.70, color="red",   linestyle="--", linewidth=1.3, label="τ = 0.70")
-    ax.axvline(0.50, color="green", linestyle="--", linewidth=1.3, label="τ = 0.50")
+    ax.axvline(0.65, color="#1f77b4",   linestyle="--", linewidth=1.3, label=f"τ {model_a} = 0.65")
+    ax.axvline(0.50, color="#ff7f0e", linestyle="--", linewidth=1.3, label=f"τ {model_b} = 0.50")
     ax.set_xlabel("Cosine similarity"); ax.set_ylabel("Density")
     ax.set_title("Pairwise similarity distributions")
     ax.set_xlim(0, 1); ax.legend()
@@ -212,17 +212,17 @@ def run_compare(model_a: str, model_b: str) -> None:
         ("Median",             "p50",         ".4f"),
         ("90th percentile",    "p90",         ".4f"),
         ("Fraction > 0.50",    "frac_gt_050", ".3f"),
-        ("Fraction > 0.70",    "frac_gt_070", ".3f"),
+        ("Fraction > 0.65",    "frac_gt_065", ".3f"),
     ]:
         print(f"{label:<28} {format(st_a[key], fmt):>16} {format(st_b[key], fmt):>16}")
 
     # Key thesis insight: find the threshold on model B that yields the same
-    # merge-rate as τ=0.70 on model A → empirical recalibration evidence.
-    target = st_a["frac_gt_070"]
+    # merge-rate as τ=0.65 on model A → empirical recalibration evidence.
+    target = st_a["frac_gt_065"]
     for tau in np.arange(0.30, 0.90, 0.01):
         if np.mean(sims_b > tau) <= target:
             print(f"\n→ τ = {tau:.2f} on {model_b} yields merge-rate ≈ "
-                  f"τ = 0.70 on {model_a}  ({target:.1%} of pairs merged)")
+                  f"τ = 0.65 on {model_a}  ({target:.1%} of pairs merged)")
             break
 
     print(f"\nSaved → {CALIB_DIR}/dist_comparison.{{png,pdf}}")

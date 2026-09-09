@@ -395,7 +395,10 @@ def run_sweep(model_name: str, op: float) -> None:
     ax.plot(taus, [r["f1"]        for r in results], "o-", color="#2ca02c",
             label="F1",        linewidth=2.2, markersize=6)
     ax.axvline(op, color="red", linestyle="--", linewidth=1.3,
-               label=f"Chosen τ = {op:.2f}")
+               label=f"Chosen main τ = {op:.2f}")
+    # Set your own choosen treshold for evaluation pipeline
+    #ax.axvline(0.50, color="purple", linestyle="--", linewidth=1.3,
+    #           label=f"Chosen evaluation τ = {0.50}")
     ax.set_xlabel("Similarity threshold τ")
     ax.set_ylabel("Score")
     ax.set_title(f"Threshold calibration – {model_name}")
