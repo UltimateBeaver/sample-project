@@ -631,7 +631,7 @@ class DocumentParser:
         # It tells you, on average, how many points off your LLM's translated sentiment is.
         MAE = sum([abs(a - b) for (a, b) in zip(original_sentiments, translated_sentiments)]) / len(original_sentiments)
         # Root Mean Squared Error (RMSE): penalizes larger errors much more harshly than smaller ones
-        RMSE = sqrt(sum([pow(abs(a - b), 2) for (a, b) in zip(original_sentiments, translated_sentiments)])) / len(original_sentiments)
+        RMSE = sqrt(sum([pow(abs(a - b), 2) for (a, b) in zip(original_sentiments, translated_sentiments)]) / len(original_sentiments))
         # Pearson Correlation coefficient: A score close to 1 means the LLM preserves the relative sentiment scaling perfectly, 
         # even if its baseline is slightly shifted (e.g., if it consistently rates everything 0.5 higher than the original)
         r = sum([(a - avg_original) * (b - avg_translated) for (a, b) in zip(original_sentiments, translated_sentiments)]) / sqrt(sum([pow(a - avg_original, 2) for a in original_sentiments]) * sum([pow(b - avg_translated, 2) for b in translated_sentiments]))

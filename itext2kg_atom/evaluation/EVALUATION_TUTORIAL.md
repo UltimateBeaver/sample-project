@@ -193,7 +193,7 @@ This test evaluates the quintuples extraction quality in two cases:
 | `OM_t` - Temporal Hallucination Rate   | (only computed if positive semantic match)         | The model got the facts right, but missed or left out the time context.                               |
 | `HALL_t` - Temporal Hallucination Rate | (only computed if positive semantic match)         | The model got the facts right, but fabricated or severely changed the date.                           |
 
-**Caution**: the _"Hallucination rate"_ term might be misleading, because the model is NOT generating false information! In this script it simply means "The model generated a true fact that the human annotator didn't bother to include in the gold standard". It could be refactored as "Redundancy rate".
+**Caution**: the _"Hallucination rate"_ term might be misleading, because the model is NOT generating false information! In this script it simply means "The model generated a true fact that the human annotator didn't bother to include in the gold standard". It could be refactored as "Redundancy rate", but kept like this to maintain the same nomenclature used by original ATOM developers.
 
 ---
 
@@ -257,7 +257,7 @@ import pandas as pd
 # From PKL to EXCEL
 pd.read_pickle("dataset_output.pkl").to_excel("dataset_output.xlsx")
 # From EXCEL to PKL
-pd.read_excel("dataset_input.xlsx").to_excel("dataset_input.pkl")
+pd.read_excel("dataset_input.xlsx").to_pickle("dataset_input.pkl")
 quit()
 ```
 

@@ -67,17 +67,20 @@ PUBLICATION_MODELS = eval_model_postfixes_to_plot_list
 
 # Publication color palette (colorblind-friendly)
 COLORS = {
-    'llamacpp_gemma4': '#1f77b4',    # Blue
-    'ollama_gemma4': '#ff7f0e',     # Orange  
-    # 'mistral': '#2ca02c',   # Green
-    # 'o3mini': '#d62728',    # Red
-    # 'gpt41': '#9467bd'      # Purple
+    'llamacpp_gemma4': '#1f77b4',                           # Blue
+    'llamacpp_gemma4-reasoning-low': '#ff7f0e',             # Orange  
+    'llamacpp_gemma-4-12B-it-QAT': '#2ca02c',               # Green
+    'llamacpp_Llama-4-Scout-17B-16E-Instruct': '#d62728',   # Red
+    'llamacpp_Qwen3.8-27B': '#9467bd'                       # Purple
 }
 
 # Precise model names for legend display
 MODEL_DISPLAY_NAMES = {
-    'llamacpp_gemma4': 'llama.cpp-gemma4-e4b',
-    'ollama_gemma4': 'ollama-gemma4-e4b',
+    'llamacpp_gemma4':                          'Gemma4-E4B',
+    'llamacpp_gemma4-reasoning-low':            'Gemma4-E4B-reasoning-low', 
+    'llamacpp_gemma-4-12B-it-QAT':              'Gemma4-12B',
+    'llamacpp_Llama-4-Scout-17B-16E-Instruct':  'Llama-4-Scout-17B-16E',
+    'llamacpp_Qwen3.8-27B':                     'Qwen3.8-27B',
 }
 
 # Font sizes for publication
@@ -141,7 +144,7 @@ def prepare_plot_data(results, max_bins=10):
     for model_name, model_results in results.items():
         for result in model_results:
             plot_data.append({
-                'model': model_name.lower(),
+                'model': model_name,
                 'token_count': result['token_count'],
                 'recall': result['recall'],
                 'recall_t': result['recall_t']
@@ -164,18 +167,39 @@ def prepare_plot_data(results, max_bins=10):
         df_plot['token_bins'] = bin_label
         unique_bins = [bin_label]
     else:
+        # num_bins = min(max_bins, num_unique)
+        # edges = np.linspace(min_tc, max_tc, num_bins + 1)
+        # edges[0] -= 1
+        # edges[-1] += 1
+        # labels = []
+        # for i in range(num_bins):
+        #     start = min_tc + i * (max_tc - min_tc) / num_bins
+        #     end   = min_tc + (i + 1) * (max_tc - min_tc) / num_bins
+        #     s_str, e_str = format_val(start), format_val(end)
+        #     labels.append(f"{s_str}-{e_str}" if s_str != e_str else s_str)
+        # df_plot['token_bins'] = pd.cut(df_plot['token_count'], bins=edges,
+        #                                labels=labels, ordered=False)
+
         num_bins = min(max_bins, num_unique)
-        edges = np.linspace(min_tc, max_tc, num_bins + 1)
-        edges[0] -= 1
-        edges[-1] += 1
+        # 1. Use pd.qcut to find bin edges that contain equal numbers of samples
+        _, bins = pd.qcut(df_plot['token_count'], q=num_bins, retbins=True, duplicates='drop')
+        
+        # 2. Build clean interval labels dynamically matching the quantile spans
         labels = []
-        for i in range(num_bins):
-            start = min_tc + i * (max_tc - min_tc) / num_bins
-            end   = min_tc + (i + 1) * (max_tc - min_tc) / num_bins
-            s_str, e_str = format_val(start), format_val(end)
+        for i in range(len(bins) - 1):
+            # Format the edges using your existing format_val function
+            s_str = format_val(bins[i])
+            e_str = format_val(bins[i+1])
             labels.append(f"{s_str}-{e_str}" if s_str != e_str else s_str)
-        df_plot['token_bins'] = pd.cut(df_plot['token_count'], bins=edges,
-                                       labels=labels, ordered=False)
+            
+        # 3. Apply the custom bins back using pd.cut with the formatted labels
+        df_plot['token_bins'] = pd.cut(
+            df_plot['token_count'], 
+            bins=bins, 
+            labels=labels, 
+            include_lowest=True, 
+            ordered=False
+        )
         unique_bins = list(dict.fromkeys(labels))
     
     # Group by token count and calculate means
