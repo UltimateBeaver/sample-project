@@ -176,7 +176,7 @@ async def extract_quintuples(contexts: list[list[str]], timestamps: list[str]) -
     logger.info(f"✅ Total extracted {total_quintuples} quintuples across {len(contexts)} contexts")
     return all_results
 
-async def extract_quintuples_wrapper(df: pd.DataFrame, quintuples_col_with_postfix: str):
+async def extract_quintuples_wrapper(df: pd.DataFrame, quintuples_col_with_postfix: str, factoids_col_with_postfix: str):
     start_time = time.time()
     try:
         print("🎯 Starting main extraction process...")
@@ -188,7 +188,7 @@ async def extract_quintuples_wrapper(df: pd.DataFrame, quintuples_col_with_postf
         logger.info(f"📝 Processing {len(selected_indices)} rows out of {num_rows} total")
 
         # Prepare contexts and timestamps for selected rows only
-        context_data = [ast.literal_eval(df.iloc[i][FACTOIDS_COL_NAME]) for i in selected_indices]
+        context_data = [ast.literal_eval(df.iloc[i][factoids_col_with_postfix]) for i in selected_indices]
         timestamp_data = [df.iloc[i][DATE_COL_NAME] for i in selected_indices]
 
         # Extract quintuples for selected contexts
@@ -203,7 +203,7 @@ async def extract_quintuples_wrapper(df: pd.DataFrame, quintuples_col_with_postf
         # Compute token count for each row
         df[column_name_quintuples_prompt_tokenc] = [
             lg_kg_construction.count_tokens(f"# Context: {txt}\n\n# Question: {Prompt.temporal_system_query(date.strftime('%Y-%m-%d') + Prompt.EXAMPLES.value)}\n\nAnswer: ")
-            for txt, date in zip(df[FACTOIDS_COL_NAME], df[DATE_COL_NAME])
+            for txt, date in zip(df[factoids_col_with_postfix], df[DATE_COL_NAME])
         ]
         
         # Save final results (do not overwrite the whole output dataset, just merge new columns)
@@ -248,8 +248,8 @@ async def main():
         return
     
     quintuples_col_with_postfix = f"{QUINTUPLES_COL_NAME}_{args.model_postfix}"
-    #factoids_extracted_col_with_postfix = f"{FACTOIDS_EXTRACTED_COL_NAME}_{args.model_postfix}"
-    await extract_quintuples_wrapper(df_nyt, quintuples_col_with_postfix)
+    factoids_extracted_col_with_postfix = f"{FACTOIDS_EXTRACTED_COL_NAME}_{args.model_postfix}"
+    await extract_quintuples_wrapper(df_nyt, quintuples_col_with_postfix, factoids_extracted_col_with_postfix)
     
 
 if __name__ == "__main__":

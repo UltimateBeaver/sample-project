@@ -3,9 +3,9 @@
 #SBATCH --nodes=1                     # Request 1 compute node
 #SBATCH --ntasks=1                    # 1 main task execution
 #SBATCH --cpus-per-task=4             # Request 4 CPU cores for data processing
-#SBATCH --mem=32GB                    # Request 32 GB system memory
+#SBATCH --mem=64GB                    # Request 32 GB system memory
 #SBATCH --gres=gpu:2                  # Request 2 GPU (Required for Gemma 4)
-#SBATCH --time=0-20:00:00             # Max runtime (Hours: 20 hours)
+#SBATCH --time=0-23:59:00             # Max runtime (Hours: 20 hours)
 #SBATCH --partition=gpu_a40           # GPU partition on the cluster
 #SBATCH --output=logs/thesis_job_stdout_%j.log    # Standard output log file
 #SBATCH --error=logs/thesis_job_stderr_%j.log     # Standard error log file
@@ -17,6 +17,14 @@ module purge
 module load miniconda3/3.13.25
 module load gcc/12.4.0
 module load nvhpc/25.1
+
+wait_for_servers() {
+    echo "Waiting for Model Server to be fully loaded..."
+    while [[ "$(curl -s http://localhost:8080/health | grep -o '"status":"ok"')" != '"status":"ok"' ]]; do
+        sleep 5
+    done
+    echo "Model Server is ready!"
+}
 
 # Use the cluster's NVHPC path to inject CUDA runtime and math libraries
 if [ -n "$NVHPC_ROOT" ]; then
@@ -34,7 +42,7 @@ find . -maxdepth 1 -type f ! -name "*$(squeue -u $(whoami) -h -o '%A')*" -exec m
 # mkdir -p $SCRATCH_FLASH/thesis-project
 # cp -r $HOME/thesis-project/sample-project $SCRATCH_FLASH/thesis-project
 echo "Syncing required project files from $HOME to $SCRATCH_FLASH..."
-rsync -av --exclude='.git' --exclude='logs' --exclude='neo4j/data' \
+rsync -av --exclude='.git' --exclude='logs' --exclude='neo4j/data' --exclude='itext2kg_atom/evaluation/_slurm_scripts/logs' \
 $HOME/thesis-project/sample-project/ \
 $SCRATCH_FLASH/thesis-project/sample-project/
 
@@ -74,8 +82,7 @@ chmod +x start-llama-servers.sh
 ./start-llama-servers.sh
 
 # Give the background engines enough time to load the GGUF models into VRAM
-echo "Waiting 30 seconds for infrastructure to boot completely..."
-sleep 30
+wait_for_servers
 
 # =========================================================================
 # 3. Run Core Python Application Pipeline

@@ -513,7 +513,7 @@ def main():
         COL_FACTOIDS_EXTRACTED =            f"{column_name_factoids_extracted}_{model_postfix}"
         COL_QUINTUPLES_RAW_TEXT_EXTRACTED = f"{column_name_quintuples_extracted_from_raw_text}_{model_postfix}"
         COL_QUINTUPLES_EXTRACTED =          f"{column_name_quintuples_extracted}_{model_postfix}"
-        COL_ENGLISH_PARAGRAPH =             f"{column_name_translated_paragraph}" if enable_translation else f"{column_name_paragraph}"
+        COL_ENGLISH_PARAGRAPH =             f"{column_name_translated_paragraph}_{model_postfix}" if enable_translation else f"{column_name_paragraph}"
         DATASET_PATH = Path(project_root / eval_output_dataset_path) if not args.dataset else Path(project_root / args.dataset)
 
         print("📊 Loading dataset...")
@@ -560,13 +560,13 @@ def main():
             )
         # ── Translation ──────────────────────────────────────────────────────
         if enable_translation and not args.skip_translation:
-            if column_name_translated_paragraph in DATASET.columns:
+            if COL_ENGLISH_PARAGRAPH in DATASET.columns:
                 all_results["translation"] = evaluate_translation(
-                    DATASET, column_name_paragraph, column_name_translated_paragraph
+                    DATASET, column_name_paragraph, COL_ENGLISH_PARAGRAPH
                 )
             else:
                 logger.warning(
-                    f"Translation enabled but column {column_name_translated_paragraph!r} "
+                    f"Translation enabled but column {COL_ENGLISH_PARAGRAPH!r} "
                     "not found; skipping."
                 )
         # ── Entity merge ─────────────────────────────────────────────────────

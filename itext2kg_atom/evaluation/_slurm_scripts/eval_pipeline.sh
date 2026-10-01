@@ -132,8 +132,8 @@ source $SCRATCH_FLASH/thesis-project/sample-project/.env
 
 # Move to the itext2kg_atom root directory
 cd $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom
-echo "Removing previously tests results for starting fresh: $EVAL_OUTPUT_RESULTS_PATH ..."
-rm -r -f $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/$EVAL_OUTPUT_RESULTS_PATH
+#echo "Removing previously tests results for starting fresh: $EVAL_OUTPUT_RESULTS_PATH ..."
+#rm -r -f $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/$EVAL_OUTPUT_RESULTS_PATH
 #rm -r -f $SCRATCH_FLASH/thesis-project/sample-project/itext2kg_atom/$EVAL_OUTPUT_DATASET_PATH
 
 # Move into the evaluation tests directory
